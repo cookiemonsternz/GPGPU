@@ -118,6 +118,45 @@ function torus(
 }
 //#endregion
 //#region Sphere
+function sphere(
+  row: number,
+  column: number,
+  rad: number,
+  color: [number, number, number, number],
+) {
+  const pos = [],
+    nor = [],
+    col = [],
+    idx = [];
+  for (let i = 0; i <= row; i++) {
+    const r = (Math.PI / row) * i;
+    const ry = Math.cos(r);
+    const rr = Math.sin(r);
+    for (let ii = 0; ii <= column; ii++) {
+      const tr = ((Math.PI * 2) / column) * ii;
+      const tx = rr * rad * Math.cos(tr);
+      const ty = ry * rad;
+      const tz = rr * rad * Math.sin(tr);
+      const rx = rr * Math.cos(tr);
+      const rz = rr * Math.sin(tr);
+      const tc = color ? color : hsva((360 / row) * i, 1, 1, 1);
+      pos.push(tx, ty, tz);
+      nor.push(rx, ry, rz);
+      if (tc) {
+        col.push(tc[0], tc[1], tc[2], tc[3]);
+      }
+    }
+  }
+  let r = 0;
+  for (let i = 0; i < row; i++) {
+    for (let ii = 0; ii < column; ii++) {
+      r = (column + 1) * i + ii;
+      idx.push(r, r + 1, r + column + 2);
+      idx.push(r, r + column + 2, r + column + 1);
+    }
+  }
+  return [pos, nor, col, idx];
+}
 //#endregion
 //#endregion
 
@@ -133,7 +172,7 @@ attStrides[0] = 3; // vec3 for position, 3 floats
 attStrides[1] = 3; // vec3 for normal, 3 floats
 attStrides[2] = 4; // vec4 for color, 4 floats
 
-const torus_data = torus(128, 128, 0.5, 1.0, [0.3, 0.7, 0.9, 1.0]); // Create torus data
+const torus_data = sphere(128, 128, 1.0, [0.3, 0.7, 0.9, 1.0]); // Create torus data
 
 // Data for vertex positions
 const vertex_positions = torus_data[0];
@@ -214,10 +253,10 @@ m.perspective(fov, aspect, near, far, pMatrix);
 m.multiply(pMatrix, vMatrix, tmpMatrix);
 
 // Set the light direction
-const lightPosition = [0, 0.0, 0.0];
+let lightPosition = [1.0, 0.5, 1.0];
 
 // Set the eye direction
-const eyeDirection = [0.0, 1.0, 3.0];
+const eyeDirection = [0.0, 2.0, 3.0];
 //#endregion
 
 //#region Draw Loop
@@ -236,8 +275,11 @@ function drawFrame() {
   // Calc rotation in radians
   const rad = ((count % 360) * Math.PI) / 180;
 
+  lightPosition = [Math.sin(count / 100) * 2, 0.5, Math.cos(count / 100) * 2];
+
   // get offset of rectangle
   m.identity(mMatrix);
+  m.translate(mMatrix, [0.0, Math.sin(rad), 0.0], mMatrix); // Translate to origin
   m.rotate(mMatrix, rad, [1.0, 1.0, 0.0], mMatrix); // Rotate around Y axis
   // Draw rectangle elements
   m.multiply(tmpMatrix, mMatrix, mvpMatrix); // MVP matrix
@@ -249,7 +291,8 @@ function drawFrame() {
   gl.uniform3fv(uniLocations[3], lightPosition); // Set the light direction
   gl.uniform3fv(uniLocations[4], eyeDirection); // Set the eye direction
   gl.uniform4fv(uniLocations[5], [0.1, 0.1, 0.1, 1.0]); // Set the ambient color
-  gl.drawElements(gl.TRIANGLES, indexes.length, gl.UNSIGNED_SHORT, 0); // Draw the rectangle
+  // Draw the object
+  gl.drawElements(gl.TRIANGLES, indexes.length, gl.UNSIGNED_SHORT, 0);
 
   // Flush to screen
   gl.flush();
