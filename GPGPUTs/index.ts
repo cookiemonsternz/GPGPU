@@ -69,7 +69,7 @@ const f_shader = createShader('fs') as WebGLShader;
 const prog = createProgram(v_shader, f_shader) as WebGLProgram;
 //#endregion
 
-//#region VBO Initialization
+//#region VBO Creation
 // VBOS
 const attLocations = new Array(2);
 attLocations[0] = gl.getAttribLocation(prog, 'position');
@@ -86,6 +86,7 @@ const vertex_positions = [
   0.0, 1.0, 0.0,
   1.0, 0.0, 0.0,
   -1.0, 0.0, 0.0,
+  0.0, -1.0, 0.0,
 ];
 
 const vertex_color = [
@@ -94,32 +95,42 @@ const vertex_color = [
   1.0, 0.0, 0.0, 1.0,
   0.0, 1.0, 0.0, 1.0,
   0.0, 0.0, 1.0, 1.0,
+  1.0, 1.0, 0.0, 1.0,
 ];
-//#endregion
 
-//#region VBO Creation
+const indexes = [
+  // indexes for vertex positions
+  // eslint-disable-next-line prettier/prettier
+  0, 1, 2,
+  1, 2, 3
+];
+
 // Create the VBO's
-const position_vbo = createVBO(vertex_positions) as WebGLBuffer;
-const color_vbo = createVBO(vertex_color) as WebGLBuffer;
+const vbos = Array(2);
+vbos[0] = createVBO(vertex_positions) as WebGLBuffer;
+vbos[1] = createVBO(vertex_color) as WebGLBuffer;
 
-// Vertex position buffer
-gl.bindBuffer(gl.ARRAY_BUFFER, position_vbo);
-gl.enableVertexAttribArray(attLocations[0]);
-gl.vertexAttribPointer(attLocations[0], attStrides[0], gl.FLOAT, false, 0, 0);
+// Bind vbos to attributes
+set_attribute(vbos, attLocations, attStrides);
 
-// Vertex color buffer
-gl.bindBuffer(gl.ARRAY_BUFFER, color_vbo);
-gl.enableVertexAttribArray(attLocations[1]);
-gl.vertexAttribPointer(attLocations[1], attStrides[1], gl.FLOAT, false, 0, 0);
+// Create the IBO
+const ibos = Array(1);
+ibos[0] = createIBO(indexes) as WebGLBuffer;
+// Bind IBO to target
+gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ibos[0]);
 //#endregion
 
 //#region Matrices Creation
+// Get the uniform location
+const uniLocation = gl.getUniformLocation(prog, 'mvpMatrix');
+
 // Prepare matrices
 const m = new matIV();
 // MVP matrix
 const mMatrix = m.identity(m.create());
 const vMatrix = m.identity(m.create());
 const pMatrix = m.identity(m.create());
+const tmpMatrix = m.identity(m.create());
 const mvpMatrix = m.identity(m.create());
 
 // View coordinate transformation matrix
@@ -135,21 +146,44 @@ const near = 0.1; // Near clipping plane
 const far = 100; // Far clipping plane
 m.perspective(fov, aspect, near, far, pMatrix);
 
-// Multiply the matrices, in order: pvm, because webgl uses backwards order
-m.multiply(pMatrix, vMatrix, mvpMatrix);
-m.multiply(mvpMatrix, mMatrix, mvpMatrix);
+// pv Matrix
+m.multiply(pMatrix, vMatrix, tmpMatrix);
 //#endregion
 
-//#region Draw to screen
-// Get the uniform location
-const uniLocation = gl.getUniformLocation(prog, 'mvpMatrix');
+//#region Draw Loop
+// Counter for current frame
+let count = 0;
 
-// Set the uniform value
-gl.uniformMatrix4fv(uniLocation, false, mvpMatrix);
+function drawFrame() {
+  // Clear the canvas
+  gl.clearColor(0.0, 0.0, 0.0, 1.0);
+  gl.clearDepth(1.0);
+  gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
-// Draw to screen
-gl.drawArrays(gl.TRIANGLES, 0, 3);
-gl.flush();
+  // Increment count
+  count++;
+
+  // Calc rotation in radians
+  const rad = ((count % 360) * Math.PI) / 180;
+
+  // get offset of rectangle
+  m.identity(mMatrix);
+  m.rotate(mMatrix, rad, [0.0, 1.0, 0.0], mMatrix); // Rotate around Y axis
+  // Draw rectangle elements
+  m.multiply(tmpMatrix, mMatrix, mvpMatrix); // MVP matrix
+  gl.uniformMatrix4fv(uniLocation, false, mvpMatrix); // Set the uniform variable
+  gl.drawElements(gl.TRIANGLES, indexes.length, gl.UNSIGNED_SHORT, 0); // Draw the rectangle
+
+  // Flush to screen
+  gl.flush();
+}
+
+function animationLoop() {
+  drawFrame();
+  //setTimeout(animationLoop, 1000 / 60);
+  requestAnimationFrame(animationLoop);
+}
+animationLoop();
 //#endregion
 
 //#region Helper Functions
@@ -184,7 +218,7 @@ function createShader(id: string) {
     xhr.open('GET', src, false);
     xhr.send(null);
     if (xhr.status !== 200) {
-      alert('Error fetching shader source');
+      alert('Error fetching shader sourcxe');
       return;
     }
     scriptElement.text = xhr.responseText;
@@ -238,7 +272,7 @@ function createVBO(data: number[]) {
   const buffer = gl.createBuffer() as WebGLBuffer;
 
   // Bind the buffer object to target, in webgl 1.0, either ARRAY_BUFFER or ELEMENT_ARRAY_BUFFER, difference is that
-  // ELEMENT_ARRAY_BUFFER is used for index buffer
+  // ELEMENT_ARRAY_BUFFER is used for IBO
   // and ARRAY_BUFFER is used for VBO
   gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
 
@@ -251,5 +285,34 @@ function createVBO(data: number[]) {
   console.log('VBO created successfully');
   // Return generated vbo
   return buffer;
+}
+
+function createIBO(data: number[]) {
+  // create base buffer object
+  const buffer = gl.createBuffer() as WebGLBuffer;
+
+  // bind object to target, in this case, IBO, so element array buffer
+  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, buffer);
+
+  // pass index data to buffer object
+  gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Int16Array(data), gl.STATIC_DRAW);
+
+  // disable buffer binding
+  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, null);
+
+  console.log('IBO created successfully');
+  // return generated ibo
+  return buffer;
+}
+
+function set_attribute(vbos: WebGLBuffer[], attLs: GLint[], attSs: number[]) {
+  for (const i in vbos) {
+    // Bind Buffer
+    gl.bindBuffer(gl.ARRAY_BUFFER, vbos[i]);
+    // Enable attribute
+    gl.enableVertexAttribArray(attLs[i]);
+    // Set attribute pointer
+    gl.vertexAttribPointer(attLs[i], attSs[i], gl.FLOAT, false, 0, 0);
+  }
 }
 //#endregion
