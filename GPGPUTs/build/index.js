@@ -3,8 +3,8 @@
 //#region Setup
 // Setup canvas and webgl
 const c = document.getElementById('canvas');
-c.width = 300;
-c.height = 300;
+c.width = 1000;
+c.height = 1000;
 const gl = c.getContext('webgl') ||
     c.getContext('experimental-webgl') ||
     alert('Your browser does not support WebGL');

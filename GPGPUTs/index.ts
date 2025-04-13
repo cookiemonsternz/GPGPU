@@ -47,8 +47,8 @@ declare const matIV: {
 // Setup canvas and webgl
 const c = document.getElementById('canvas') as HTMLCanvasElement;
 
-c.width = 300;
-c.height = 300;
+c.width = 1000;
+c.height = 1000;
 
 const gl =
   (c.getContext('webgl') as WebGLRenderingContext) ||
