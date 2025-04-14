@@ -1,5 +1,5 @@
-"use strict";
-//#endregion
+import * as shapes from './shapes.js';
+import { matIV } from './minMatrix.js';
 //#region Setup
 //#region Setup canvas and webgl
 const c = document.getElementById('canvas');
