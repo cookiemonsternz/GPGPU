@@ -60,13 +60,14 @@ gl.clearColor(0.0, 0.0, 0.0, 1.0);
 gl.clearDepth(1.0);
 gl.clear(gl.COLOR_BUFFER_BIT);
 
-// Culling and Depth Testing
-// Culling hides back faces, depth testing changes draw order
-gl.enable(gl.CULL_FACE);
-gl.frontFace(gl.CCW);
-// Depth testing
-gl.enable(gl.DEPTH_TEST);
-gl.depthFunc(gl.LEQUAL);
+let texture = createImg('./texture.png');
+// // Culling and Depth Testing
+// // Culling hides back faces, depth testing changes draw order
+// gl.enable(gl.CULL_FACE);
+// gl.frontFace(gl.CCW);
+// // Depth testing
+// gl.enable(gl.DEPTH_TEST);
+// gl.depthFunc(gl.LEQUAL);
 //#endregion
 
 //#region Shaders Initialization
@@ -166,28 +167,62 @@ const attLocations = new Array(2);
 attLocations[0] = gl.getAttribLocation(prog, 'position');
 attLocations[1] = gl.getAttribLocation(prog, 'normal');
 attLocations[2] = gl.getAttribLocation(prog, 'color');
+attLocations[3] = gl.getAttribLocation(prog, 'textureCoord');
 
 const attStrides = new Array(2);
 attStrides[0] = 3; // vec3 for position, 3 floats
 attStrides[1] = 3; // vec3 for normal, 3 floats
 attStrides[2] = 4; // vec4 for color, 4 floats
+attStrides[3] = 2; // vec2 for texture coord, 2 floats
 
-const torus_data = sphere(128, 128, 1.0, [0.3, 0.7, 0.9, 1.0]); // Create torus data
+// const torus_data = torus(128, 128, 0.25, 0.75, [0.3, 0.7, 0.9, 1.0]); // Create torus data
 
-// Data for vertex positions
-const vertex_positions = torus_data[0];
+// // Data for vertex positions
+// const vertex_positions = torus_data[0];
+const vertex_positions = [
+  // eslint-disable-next-line prettier/prettier
+  -1.0, 1.0, 0.0,
+  1.0, 1.0, 0.0,
+  -1.0, -1.0, 0.0,
+  1.0, -1.0, 0.0,
+];
+// const vertex_normals = torus_data[1];
+const vertex_normals = [
+  // eslint-disable-next-line prettier/prettier
+  0.0, 0.0, 1.0,
+  0.0, 0.0, 1.0,
+  0.0, 0.0, 1.0,
+  0.0, 0.0, 1.0,
+];
+// const vertex_color = torus_data[2];
+const vertex_color = [
+  // eslint-disable-next-line prettier/prettier
+  1.0, 1.0, 1.0, 1.0,
+  1.0, 1.0, 1.0, 1.0,
+  1.0, 1.0, 1.0, 1.0,
+  1.0, 1.0, 1.0, 1.0,
+];
+// eslint-disable-next-line prettier/prettier
+const texture_coord = [
+  0.0, 0.0,
+  1.0, 0.0,
+  0.0, 1.0,
+  1.0, 1.0
+];
 
-const vertex_normals = torus_data[1];
-
-const vertex_color = torus_data[2];
-
-const indexes = torus_data[3];
+// const indexes = torus_data[3];
+// eslint-disable-next-line prettier/prettier
+const indexes = [
+  0, 1, 2,
+  3, 2, 1
+];
 
 // Create the VBO's
 const vbos = Array(2);
 vbos[0] = createVBO(vertex_positions) as WebGLBuffer;
 vbos[1] = createVBO(vertex_normals) as WebGLBuffer;
 vbos[2] = createVBO(vertex_color) as WebGLBuffer;
+vbos[3] = createVBO(texture_coord) as WebGLBuffer;
 
 // Bind vbos to attributes
 set_attribute(vbos, attLocations, attStrides);
@@ -226,6 +261,11 @@ uniLocations[5] = gl.getUniformLocation(
   prog,
   'ambientColor',
 ) as WebGLUniformLocation;
+uniLocations[6] = gl.getUniformLocation(
+  prog,
+  'texture',
+) as WebGLUniformLocation;
+
 // Prepare matrices
 const m = new matIV();
 // MVP matrix
@@ -257,6 +297,10 @@ let lightPosition = [1.0, 0.5, 1.0];
 
 // Set the eye direction
 const eyeDirection = [0.0, 2.0, 3.0];
+
+gl.activeTexture(gl.TEXTURE0);
+gl.bindTexture(gl.TEXTURE_2D, texture);
+gl.uniform1i(uniLocations[6], 0); // Set the texture uniform variable
 //#endregion
 
 //#region Draw Loop
@@ -279,8 +323,8 @@ function drawFrame() {
 
   // get offset of rectangle
   m.identity(mMatrix);
-  m.translate(mMatrix, [0.0, Math.sin(rad), 0.0], mMatrix); // Translate to origin
-  m.rotate(mMatrix, rad, [1.0, 1.0, 0.0], mMatrix); // Rotate around Y axis
+  // m.translate(mMatrix, [0.0, Math.sin(rad), 0.0], mMatrix); // Translate to origin
+  // m.rotate(mMatrix, rad, [1.0, 1.0, 0.0], mMatrix); // Rotate around Y axis
   // Draw rectangle elements
   m.multiply(tmpMatrix, mMatrix, mvpMatrix); // MVP matrix
   m.inverse(mMatrix, invMatrix); // Inverse matrix
@@ -288,9 +332,9 @@ function drawFrame() {
   gl.uniformMatrix4fv(uniLocations[0], false, mvpMatrix); // Set the uniform variable
   gl.uniformMatrix4fv(uniLocations[1], false, mMatrix); // Set the model matrix uniform variable
   gl.uniformMatrix4fv(uniLocations[2], false, invMatrix); // Set the uniform variable
-  gl.uniform3fv(uniLocations[3], lightPosition); // Set the light direction
+  gl.uniform3fv(uniLocations[3], lightPosition); // Set the light position
   gl.uniform3fv(uniLocations[4], eyeDirection); // Set the eye direction
-  gl.uniform4fv(uniLocations[5], [0.1, 0.1, 0.1, 1.0]); // Set the ambient color
+  gl.uniform4fv(uniLocations[5], [0.05, 0.05, 0.05, 1.0]); // Set the ambient color
   // Draw the object
   gl.drawElements(gl.TRIANGLES, indexes.length, gl.UNSIGNED_SHORT, 0);
 
@@ -424,6 +468,55 @@ function createIBO(data: number[]) {
   // return generated ibo
   return buffer;
 }
+
+function createImg(source: string) {
+  const img = new Image();
+  img.onload = function () {
+    const tex = gl.createTexture();
+
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
+
+    gl.generateMipmap(gl.TEXTURE_2D);
+
+    gl.bindTexture(gl.TEXTURE_2D, null);
+
+    console.log('Texture created successfully');
+    texture = tex;
+  };
+
+  img.src = source;
+}
+
+// function create_texture(source){
+//   // イメージオブジェクトの生成
+//   var img = new Image();
+
+//   // データのオンロードをトリガーにする
+//   img.onload = function(){
+//       // テクスチャオブジェクトの生成
+//       var tex = gl.createTexture();
+
+//       // テクスチャをバインドする
+//       gl.bindTexture(gl.TEXTURE_2D, tex);
+
+//       // テクスチャへイメージを適用
+//       gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
+
+//       // ミップマップを生成
+//       gl.generateMipmap(gl.TEXTURE_2D);
+
+//       // テクスチャのバインドを無効化
+//       gl.bindTexture(gl.TEXTURE_2D, null);
+
+//       // 生成したテクスチャをグローバル変数に代入
+//       texture = tex;
+//   };
+
+//   // イメージオブジェクトのソースを指定
+//   img.src = source;
+// }
 
 function set_attribute(vbos: WebGLBuffer[], attLs: GLint[], attSs: number[]) {
   for (const i in vbos) {
