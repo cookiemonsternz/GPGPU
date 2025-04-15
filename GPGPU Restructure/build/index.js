@@ -1,11 +1,31 @@
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+var _a;
 import { matIV } from './minMatrix.js';
 // **** Initial Setup ****
-const c = document.getElementById('canvas');
+// Canvas - Gets the canvas element + error handling so typescript doesn't bully me :(
+const cElement = document.getElementById('canvas');
+if (!(cElement instanceof HTMLCanvasElement)) {
+    alert('Canvas element not found or null');
+    throw new Error('Canvas element not found or null');
+}
+const c = cElement;
 c.width = 500;
 c.height = 500;
-const gl = c.getContext('webgl') ||
-    c.getContext('experimental-webgl') ||
-    alert('Your browser does not support WebGL');
+// WebGL Context - Gets the context, checks that the getting of the context didn't fail.
+const glContext = (_a = c.getContext('webgl')) !== null && _a !== void 0 ? _a : c.getContext('experimental-webgl');
+if (!glContext) {
+    alert('Your browser does not support webgl');
+    throw new Error('WebGL context unavailable');
+}
+const gl = glContext;
 // Clear Screen - Sets the globals for clear color and depth, and then clears the screen / depth buffer
 gl.clearColor(0.0, 0.0, 0.0, 1.0);
 gl.clearDepth(1.0);
@@ -13,12 +33,20 @@ gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 // Create Shaders - Creates and compiles the shaders
 const v_shader = createShader('vs');
 const f_shader = createShader('fs');
+if (!v_shader || !f_shader) {
+    console.error('Failed to create shaders');
+    throw new Error('Shader creation failed'); // Stop
+}
 // Create Program - Responsible for linking together v and f shader, as well
 const prog = createProgram(v_shader, f_shader);
-// Culling - Enables culling of back faces, so we don't draw the back of the object
+if (!prog) {
+    console.error('Failed to create program');
+    throw new Error('Program creation failed'); // Stop
+}
+// Culling - Enables culling of back faces, so no back faces drawn duh
 gl.enable(gl.CULL_FACE);
 gl.frontFace(gl.CCW);
-// Depth testing - Enables depth testing, so we don't draw pixels that are behind other pixels
+// Depth testing - Enables depth testing, draw objects in order of depth (kinda)
 gl.enable(gl.DEPTH_TEST);
 gl.depthFunc(gl.LEQUAL);
 // **** Vertex Attributes ****
@@ -42,7 +70,7 @@ const attStrides = [
     positionAttStrides,
     normalAttStrides,
     colorAttStrides,
-    textureCoordAttLocation,
+    textureCoordAttStrides,
 ];
 // Vertex Data - All the info for the vertexes
 // const torus_data = shapes.torus(128, 128, 0.5, 1.0, [1.0, 1.0, 1.0, 1.0]);
@@ -52,18 +80,20 @@ const attStrides = [
 //   color: torus_data[2],
 //   indices: torus_data[3],
 // };
+// basic rectangle, blue, would format it but prettier doesn't like it and tbh its not worth it
 const vertex_data = {
     position: [-1.0, -1.0, 0.0, 1.0, -1.0, 0.0, 1.0, 1.0, 0.0, -1.0, 1.0, 0.0],
     normal: [0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0],
-    color: [0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 1.0, 1.0],
+    color: Array(16).fill(1.0),
     textureCoordinates: [0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0],
     indices: [0, 1, 2, 2, 3, 0],
 };
 // VBO's - Vertex Buffer Objects, basically just putting the data into webgl
-const vbos = Array(2);
+const vbos = Array(4);
 vbos[0] = createVBO(vertex_data.position);
 vbos[1] = createVBO(vertex_data.normal);
 vbos[2] = createVBO(vertex_data.color);
+vbos[3] = createVBO(vertex_data.textureCoordinates);
 // Bind vbos to attributes
 set_attribute(vbos, attLocations, attStrides);
 // **** IBO ****
@@ -72,19 +102,33 @@ ibos[0] = createIBO(vertex_data.indices);
 // Bind IBO to target
 gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ibos[0]);
 // **** UNIFORM LOCATIONS ****
+const uniformNames = [
+    'mvpMatrix',
+    'mMatrix',
+    'invMatrix',
+    'lightPosition',
+    'eyeDirection',
+    'ambientColor',
+];
 const uniLocations = [];
-// eslint-disable-next-line prettier/prettier
-uniLocations[0] = gl.getUniformLocation(prog, 'mvpMatrix');
-// eslint-disable-next-line prettier/prettier
-uniLocations[1] = gl.getUniformLocation(prog, 'mMatrix');
-// eslint-disable-next-line prettier/prettier
-uniLocations[2] = gl.getUniformLocation(prog, 'invMatrix');
-// eslint-disable-next-line prettier/prettier
-uniLocations[3] = gl.getUniformLocation(prog, 'lightPosition');
-// eslint-disable-next-line prettier/prettier
-uniLocations[4] = gl.getUniformLocation(prog, 'eyeDirection');
-// eslint-disable-next-line prettier/prettier
-uniLocations[5] = gl.getUniformLocation(prog, 'ambientColor');
+for (let i = 0; i < uniformNames.length; i++) {
+    // Get the uniform location, more webgl global states :sigh:
+    uniLocations[i] = gl.getUniformLocation(prog, uniformNames[i]);
+    if (uniLocations[i] === null) {
+        console.error(`Uniform location for '${uniformNames[i]}' is null`);
+        throw new Error(`Uniform location for '${uniformNames[i]}' not found`);
+    }
+}
+// Texture Uniforms - Seperate, idk if this is the best way bc I haven't actually tried to do multiple textures yet
+const textureUniformNames = ['texture0', 'texture1'];
+const textureUniformLocations = [];
+for (let i = 0; i < textureUniformNames.length; i++) {
+    textureUniformLocations[i] = gl.getUniformLocation(prog, textureUniformNames[i]);
+    if (textureUniformLocations[i] === null) {
+        console.error(`Texture uniform location for '${textureUniformNames[i]}' is null`);
+        throw new Error(`Texture uniform location for '${textureUniformNames[i]}' not found`);
+    }
+}
 // **** MATRIX SETUP ****
 // Matrix class
 const m = new matIV();
@@ -96,7 +140,7 @@ const tmpMatrix = m.identity(m.create()); // View * Projection matrix (used so w
 const mvpMatrix = m.identity(m.create()); // Projection * View * Model matrix, passed to shaders
 const invMatrix = m.identity(m.create()); // Inverse mvpMatrix for lighting calculations, so light doesn't also have model transform applied
 // vMatrix - Contains information about the camera
-const eye = [0.0, 1.0, 3.0]; // Camera position
+const eye = [0.0, 2.0, 3.0]; // Camera position
 const center = [0.0, 0.0, 0.0]; // Look at point
 const up = [0.0, 1.0, 0.0]; // Up direction
 m.lookAt(eye, center, up, vMatrix);
@@ -106,13 +150,40 @@ const aspect = c.width / c.height; // Aspect ratio
 const near = 0.1; // Near clipping plane
 const far = 100; // Far clipping plane
 m.perspective(fov, aspect, near, far, pMatrix);
-// Calculate tmpMatrix - Does this here so not needed to be done every frame
+// Calculate tmpMatrix - Does this here instead of render loop so not needed to be done every frame
 m.multiply(pMatrix, vMatrix, tmpMatrix);
 // **** UNIFORMS INIT VALUES ****
-// Set the light direction
+// Set the light position
 let lightPosition = [1.0, 0.5, 1.0];
 // Set the eye direction
 const eyeDirection = [0.0, 2.0, 3.0];
+// **** Texture ****
+// Load Textures - Need to load the src as html image, then bind to webgl, then attach to uniform
+const texture_srcs = ['../static/img.png', '../static/img2.png'];
+// load async in parallel
+function loadTextures(textures) {
+    return __awaiter(this, void 0, void 0, function* () {
+        const loadedTextures = yield Promise.all(textures.map(texture => createTexture(texture)));
+        return loadedTextures;
+    });
+}
+let textures = [];
+loadTextures(texture_srcs)
+    .then(loadedTextures => {
+    textures = loadedTextures.filter((tex) => tex !== null);
+    // Somethings stuffed, maybe non 2^x img size?
+    if (textures.length !== texture_srcs.length) {
+        console.warn('Some textures failed to load.');
+    }
+    // Somethings really stuffed
+    if (textures.length === 0 && texture_srcs.length > 0) {
+        throw new Error('Failed to load any textures.');
+    }
+    animationLoop();
+})
+    .catch(error => {
+    console.error('Error loading textures:', error);
+});
 // Counter for current frame
 let count = 0;
 function drawFrame() {
@@ -145,23 +216,29 @@ function drawFrame() {
     gl.uniform3fv(uniLocations[4], eyeDirection);
     // ambientColor
     gl.uniform4fv(uniLocations[5], [0.1, 0.1, 0.1, 1.0]);
+    // texture
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, textures[0]);
+    gl.uniform1i(textureUniformLocations[0], 0);
+    gl.activeTexture(gl.TEXTURE1);
+    gl.bindTexture(gl.TEXTURE_2D, textures[1]);
+    gl.uniform1i(textureUniformLocations[1], 1);
     // Draw Elements - Used to draw a mesh using an index buffer rather than just raw vertices.
     gl.drawElements(gl.TRIANGLES, vertex_data.indices.length, gl.UNSIGNED_SHORT, 0);
     // Flush - Isn't required, ensures all issued commands are executed asap
-    gl.flush();
+    // gl.flush();
 }
 function animationLoop() {
     drawFrame();
     requestAnimationFrame(animationLoop);
 }
-animationLoop();
 function createShader(id) {
     let shader = null;
     // Get the shader source
     const scriptElement = document.getElementById(id);
     // Make sure source exists
-    if (!scriptElement) {
-        alert('Shader not found');
+    if (!scriptElement || !(scriptElement instanceof HTMLScriptElement)) {
+        console.error('Shader not found');
         return;
     }
     switch (scriptElement.type) {
@@ -175,7 +252,7 @@ function createShader(id) {
             break;
         // If not a shader, yell at me
         default:
-            alert('Unknown shader type');
+            console.error('Unknown shader type');
             return;
     }
     // Get the shader source text, need to fetch from src attribute, bc script is stored in external file.
@@ -186,7 +263,7 @@ function createShader(id) {
         xhr.open('GET', src, false);
         xhr.send(null);
         if (xhr.status !== 200) {
-            alert('Error fetching shader sourcxe');
+            console.error('Error fetching shader sourcxe');
             return;
         }
         scriptElement.text = xhr.responseText;
@@ -201,7 +278,7 @@ function createShader(id) {
         return shader;
     }
     else {
-        alert('Error compiling' +
+        console.error('Error compiling' +
             scriptElement.type +
             'shader: ' +
             gl.getShaderInfoLog(shader));
@@ -212,6 +289,10 @@ function createShader(id) {
 function createProgram(vs, fs) {
     // create a program object
     const program = gl.createProgram();
+    if (!program) {
+        console.error('Error while creating program');
+        throw new Error('Could not create program');
+    }
     // Attach the shaders to the program
     gl.attachShader(program, vs);
     gl.attachShader(program, fs);
@@ -225,7 +306,7 @@ function createProgram(vs, fs) {
         return program;
     }
     else {
-        alert(gl.getProgramInfoLog(program));
+        console.error(gl.getProgramInfoLog(program));
         gl.deleteProgram(program);
         return null;
     }
@@ -233,6 +314,10 @@ function createProgram(vs, fs) {
 function createVBO(data) {
     // Create the buffer object
     const buffer = gl.createBuffer();
+    if (!buffer) {
+        console.error('Error while creating buffer');
+        throw new Error('Could not create buffer');
+    }
     // Bind the buffer object to target, in webgl 1.0, either ARRAY_BUFFER or ELEMENT_ARRAY_BUFFER, difference is that
     // ELEMENT_ARRAY_BUFFER is used for IBO
     // and ARRAY_BUFFER is used for VBO
@@ -248,6 +333,10 @@ function createVBO(data) {
 function createIBO(data) {
     // create base buffer object
     const buffer = gl.createBuffer();
+    if (!buffer) {
+        console.error('Error while creating buffer');
+        throw new Error('Could not create buffer');
+    }
     // bind object to target, in this case, IBO, so element array buffer
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, buffer);
     // pass index data to buffer object
@@ -267,6 +356,33 @@ function set_attribute(vbos, attLs, attSs) {
         // Set attribute pointer
         gl.vertexAttribPointer(attLs[i], attSs[i], gl.FLOAT, false, 0, 0);
     }
+}
+function loadImage(src) {
+    return __awaiter(this, void 0, void 0, function* () {
+        return new Promise((resolve, reject) => {
+            const img = new Image();
+            img.onload = () => resolve(img);
+            img.onerror = e => reject(new Error(`Failed to load image: ${src}`));
+            img.src = src;
+        });
+    });
+}
+function createTexture(src) {
+    return __awaiter(this, void 0, void 0, function* () {
+        try {
+            const img = yield loadImage(src);
+            const tex = gl.createTexture();
+            gl.bindTexture(gl.TEXTURE_2D, tex);
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
+            gl.generateMipmap(gl.TEXTURE_2D);
+            gl.bindTexture(gl.TEXTURE_2D, null);
+            return tex;
+        }
+        catch (error) {
+            console.error(error);
+            return null;
+        }
+    });
 }
 function hsva(h, s, v, a) {
     if (s > 1 || v > 1 || a > 1) {
