@@ -78,23 +78,24 @@ const attStrides = [
 
 // Vertex Data - All the info for the vertexes
 
-// const torus_data = shapes.torus(128, 128, 0.5, 1.0, [1.0, 1.0, 1.0, 1.0]);
+const torus_data = shapes.torus(128, 128, 0.5, 1.0, [1.0, 1.0, 1.0, 1.0]);
 
-// const vertex_data = {
-//   position: torus_data[0],
-//   normal: torus_data[1],
-//   color: torus_data[2],
-//   indices: torus_data[3],
-// };
+const vertex_data = {
+  position: torus_data[0],
+  normal: torus_data[1],
+  color: torus_data[2],
+  textureCoordinates: torus_data[4],
+  indices: torus_data[3],
+};
 
 // basic rectangle, blue, would format it but prettier doesn't like it and tbh its not worth it
-const vertex_data = {
-  position: [-1.0, -1.0, 0.0, 1.0, -1.0, 0.0, 1.0, 1.0, 0.0, -1.0, 1.0, 0.0],
-  normal: [0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0],
-  color: Array(16).fill(1.0),
-  textureCoordinates: [0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0],
-  indices: [0, 1, 2, 2, 3, 0],
-};
+// const vertex_data = {
+//   position: [-1.0, -1.0, 0.0, 1.0, -1.0, 0.0, 1.0, 1.0, 0.0, -1.0, 1.0, 0.0],
+//   normal: [0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0],
+//   color: Array(16).fill(1.0),
+//   textureCoordinates: [0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0],
+//   indices: [0, 1, 2, 2, 3, 0],
+// };
 
 // VBO's - Vertex Buffer Objects, basically just putting the data into webgl
 const vbos = Array(4);
