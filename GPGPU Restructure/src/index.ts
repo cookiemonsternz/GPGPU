@@ -141,7 +141,7 @@ for (let i = 0; i < uniformNames.length; i++) {
 }
 
 // Texture Uniforms - Seperate, idk if this is the best way bc I haven't actually tried to do multiple textures yet
-const textureUniformNames = ['texture0', 'texture1'];
+const textureUniformNames = ['texture'];
 
 const textureUniformLocations: WebGLUniformLocation[] = [];
 
@@ -201,7 +201,7 @@ const eyeDirection = [0.0, 2.0, 3.0];
 // **** Texture ****
 
 // Load Textures - Need to load the src as html image, then bind to webgl, then attach to uniform
-const texture_srcs = ['../static/img.png', '../static/img2.png'];
+const texture_srcs = ['../static/img.png'];
 
 // load async in parallel
 async function loadTextures(textures: string[]) {
@@ -275,10 +275,6 @@ function drawFrame() {
   gl.activeTexture(gl.TEXTURE0);
   gl.bindTexture(gl.TEXTURE_2D, textures[0]);
   gl.uniform1i(textureUniformLocations[0], 0);
-
-  gl.activeTexture(gl.TEXTURE1);
-  gl.bindTexture(gl.TEXTURE_2D, textures[1]);
-  gl.uniform1i(textureUniformLocations[1], 1);
 
   // Draw Elements - Used to draw a mesh using an index buffer rather than just raw vertices.
   gl.drawElements(
