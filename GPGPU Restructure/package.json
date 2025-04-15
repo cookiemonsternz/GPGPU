@@ -1,10 +1,12 @@
 {
   "devDependencies": {
+    "@types/node": "^22.7.5",
+    "cpx": "^1.5.0",
     "gts": "^6.0.2",
-    "typescript": "^5.6.3",
-    "@types/node": "^22.7.5"
+    "typescript": "^5.6.3"
   },
   "scripts": {
+    "copy-static": "cpx \"./src/**/*.{html,glsl}\" ./build --watch",
     "lint": "gts lint",
     "clean": "gts clean",
     "compile": "tsc",

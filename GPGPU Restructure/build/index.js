@@ -1,4 +1,3 @@
-import * as shapes from './shapes.js';
 import { matIV } from './minMatrix.js';
 // **** Initial Setup ****
 const c = document.getElementById('canvas');
@@ -46,12 +45,19 @@ const attStrides = [
     textureCoordAttLocation,
 ];
 // Vertex Data - All the info for the vertexes
-const torus_data = shapes.torus(128, 128, 0.5, 1.0, [1.0, 1.0, 1.0, 1.0]);
+// const torus_data = shapes.torus(128, 128, 0.5, 1.0, [1.0, 1.0, 1.0, 1.0]);
+// const vertex_data = {
+//   position: torus_data[0],
+//   normal: torus_data[1],
+//   color: torus_data[2],
+//   indices: torus_data[3],
+// };
 const vertex_data = {
-    position: torus_data[0],
-    normal: torus_data[1],
-    color: torus_data[2],
-    indices: torus_data[3],
+    position: [-1.0, -1.0, 0.0, 1.0, -1.0, 0.0, 1.0, 1.0, 0.0, -1.0, 1.0, 0.0],
+    normal: [0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0],
+    color: [0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 1.0, 1.0],
+    textureCoordinates: [0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0],
+    indices: [0, 1, 2, 2, 3, 0],
 };
 // VBO's - Vertex Buffer Objects, basically just putting the data into webgl
 const vbos = Array(2);
@@ -121,8 +127,8 @@ function drawFrame() {
     lightPosition = [Math.sin(count / 100) * 2, 0.5, Math.cos(count / 100) * 2];
     // Calculate mMatrix - Controls the transformation of object
     m.identity(mMatrix);
-    m.translate(mMatrix, [0.0, Math.sin(rad), 0.0], mMatrix); // Translate to origin
-    m.rotate(mMatrix, rad, [1.0, 1.0, 0.0], mMatrix); // Rotate around Y axis
+    // m.translate(mMatrix, [0.0, Math.sin(rad), 0.0], mMatrix); // Translate to origin
+    // m.rotate(mMatrix, rad, [1.0, 1.0, 0.0], mMatrix); // Rotate around Y axis
     // Calculate mvpMatrix - Uses m, v, and p Matrices, and also generates the inverse for lighting calculations
     m.multiply(tmpMatrix, mMatrix, mvpMatrix); // MVP matrix
     m.inverse(mMatrix, invMatrix); // Inverse matrix
