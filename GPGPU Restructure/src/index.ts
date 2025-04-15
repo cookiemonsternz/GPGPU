@@ -1,9 +1,8 @@
 import * as shapes from './shapes.js';
 import {matIV} from './minMatrix.js';
 
-//#region Setup
+// **** Initial Setup ****
 
-//#region Setup canvas and webgl
 const c = document.getElementById('canvas') as HTMLCanvasElement;
 
 c.width = 500;
@@ -14,103 +13,81 @@ const gl =
   (c.getContext('experimental-webgl') as WebGLRenderingContext) ||
   alert('Your browser does not support WebGL');
 
-//#endregion
-
-//#region Clear canvas
-
+// Clear Screen - Sets the globals for clear color and depth, and then clears the screen / depth buffer
 gl.clearColor(0.0, 0.0, 0.0, 1.0);
 gl.clearDepth(1.0);
-gl.clear(gl.COLOR_BUFFER_BIT);
+gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
-//#endregion
-
-//#region Shaders + Prog
-
+// Create Shaders - Creates and compiles the shaders
 const v_shader = createShader('vs') as WebGLShader;
 const f_shader = createShader('fs') as WebGLShader;
 
+// Create Program - Responsible for linking together v and f shader, as well
 const prog = createProgram(v_shader, f_shader) as WebGLProgram;
 
-//#endregion
-
-//#region Culling and Depth Testing
-
-// Culling
+// Culling - Enables culling of back faces, so we don't draw the back of the object
 gl.enable(gl.CULL_FACE);
 gl.frontFace(gl.CCW);
 
-// Depth testing
+// Depth testing - Enables depth testing, so we don't draw pixels that are behind other pixels
 gl.enable(gl.DEPTH_TEST);
 gl.depthFunc(gl.LEQUAL);
 
-//#endregion
-
-//#endregion
-
-//#region VBO Creation
-
-//#region Attribute locations
+// **** Vertex Attributes ****
 
 // Att. Location - basically index of the buffer, needs to be called after shader compilation
 const positionAttLocation = gl.getAttribLocation(prog, 'position');
 const normalAttLocation = gl.getAttribLocation(prog, 'normal');
 const colorAttLocation = gl.getAttribLocation(prog, 'color');
-const attLocations = [positionAttLocation, normalAttLocation, colorAttLocation];
-
-//#endregion
-
-//#region Attribute strides
+const textureCoordAttLocation = gl.getAttribLocation(prog, 'textureCoord');
+const attLocations = [
+  positionAttLocation,
+  normalAttLocation,
+  colorAttLocation,
+  textureCoordAttLocation,
+];
 
 // Att. Stride - How many numbers in each index of the buffer, e.g, 3 for vec3, etc...
 const positionAttStrides = 3; // vec3 for position, 3 floats
 const normalAttStrides = 3; // vec3 for normal, 3 floats
 const colorAttStrides = 4; // vec4 for color, 4 floats
-const attStrides = [positionAttStrides, normalAttStrides, colorAttStrides];
+const textureCoordAttStrides = 2; // vec2 for texture coordinates, 2 floats
+const attStrides = [
+  positionAttStrides,
+  normalAttStrides,
+  colorAttStrides,
+  textureCoordAttLocation,
+];
 
-//#endregion
+// Vertex Data - All the info for the vertexes
 
-const torus_data = shapes.sphere(128, 128, 1.0, [0.3, 0.7, 0.9, 1.0]); // Create torus data
+const torus_data = shapes.torus(128, 128, 0.5, 1.0, [1.0, 1.0, 1.0, 1.0]);
 
-// Data for vertex positions
-const vertex_positions = torus_data[0];
+const vertex_data = {
+  position: torus_data[0],
+  normal: torus_data[1],
+  color: torus_data[2],
+  indices: torus_data[3],
+};
 
-const vertex_normals = torus_data[1];
-
-const vertex_color = torus_data[2];
-
-const indexes = torus_data[3];
-
-//#region VBO + IBO Binding + Creation
-
-//#region VBOS
-
+// VBO's - Vertex Buffer Objects, basically just putting the data into webgl
 const vbos = Array(2);
-vbos[0] = createVBO(vertex_positions) as WebGLBuffer;
-vbos[1] = createVBO(vertex_normals) as WebGLBuffer;
-vbos[2] = createVBO(vertex_color) as WebGLBuffer;
+vbos[0] = createVBO(vertex_data.position) as WebGLBuffer;
+vbos[1] = createVBO(vertex_data.normal) as WebGLBuffer;
+vbos[2] = createVBO(vertex_data.color) as WebGLBuffer;
 
 // Bind vbos to attributes
 set_attribute(vbos, attLocations, attStrides);
 
-//#endregion
-
-//#region IBO
+// **** IBO ****
 
 const ibos = Array(1);
-ibos[0] = createIBO(indexes) as WebGLBuffer;
+ibos[0] = createIBO(vertex_data.indices) as WebGLBuffer;
 
 // Bind IBO to target
 gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ibos[0]);
 
-//#endregion
-
-//#endregion
-
-//#endregion
-
-//#region Matrices Creation
-
-//#region Uniform locations
+// **** UNIFORM LOCATIONS ****
 
 const uniLocations: WebGLUniformLocation[] = [];
 // eslint-disable-next-line prettier/prettier
@@ -126,13 +103,12 @@ uniLocations[4] = gl.getUniformLocation(prog,'eyeDirection') as WebGLUniformLoca
 // eslint-disable-next-line prettier/prettier
 uniLocations[5] = gl.getUniformLocation(prog,'ambientColor',) as WebGLUniformLocation;
 
-//#endregion
+// **** MATRIX SETUP ****
 
-// Prepare matrices
+// Matrix class
 const m = new matIV();
 
-//#region Matrix initializations
-
+// Initialize Matrices - create creates a float32array, identity sets it to all zeroes
 const mMatrix = m.identity(m.create()); // Model matrix (transform)
 const vMatrix = m.identity(m.create()); // View matrix (camera transform)
 const pMatrix = m.identity(m.create()); // Projection matrix (projection ig?)
@@ -140,32 +116,23 @@ const tmpMatrix = m.identity(m.create()); // View * Projection matrix (used so w
 const mvpMatrix = m.identity(m.create()); // Projection * View * Model matrix, passed to shaders
 const invMatrix = m.identity(m.create()); // Inverse mvpMatrix for lighting calculations, so light doesn't also have model transform applied
 
-//#endregion
-
-//#region View coordinate transformation matrix
-
+// vMatrix - Contains information about the camera
 const eye: [number, number, number] = [0.0, 1.0, 3.0]; // Camera position
 const center: [number, number, number] = [0.0, 0.0, 0.0]; // Look at point
 const up: [number, number, number] = [0.0, 1.0, 0.0]; // Up direction
 m.lookAt(eye, center, up, vMatrix);
 
-//#endregion
-
-//#region Perspective projection matrix
-
+// pMatrix - Contains the projection transformation, fov and clipping planes
 const fov = 90; // Field of view
 const aspect = c.width / c.height; // Aspect ratio
 const near = 0.1; // Near clipping plane
 const far = 100; // Far clipping plane
 m.perspective(fov, aspect, near, far, pMatrix);
 
-//#endregion
-
-//#region pv Matrix
-
+// Calculate tmpMatrix - Does this here so not needed to be done every frame
 m.multiply(pMatrix, vMatrix, tmpMatrix);
 
-//#endregion
+// **** UNIFORMS INIT VALUES ****
 
 // Set the light direction
 let lightPosition = [1.0, 0.5, 1.0];
@@ -173,18 +140,14 @@ let lightPosition = [1.0, 0.5, 1.0];
 // Set the eye direction
 const eyeDirection = [0.0, 2.0, 3.0];
 
-//#endregion
-
-//#region Draw Loop
 // Counter for current frame
 let count = 0;
-//#region Frame Drawing
+
 function drawFrame() {
-  //#region Clear canvas
+  // Clear Screen - Clears the screen
   gl.clearColor(0.0, 0.0, 0.0, 1.0);
   gl.clearDepth(1.0);
   gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-  //#endregion
 
   // Increment count
   count += 0.5;
@@ -194,44 +157,48 @@ function drawFrame() {
 
   lightPosition = [Math.sin(count / 100) * 2, 0.5, Math.cos(count / 100) * 2];
 
-  //#region Rectangle matrices (calculating the model matrix)
+  // Calculate mMatrix - Controls the transformation of object
   m.identity(mMatrix);
   m.translate(mMatrix, [0.0, Math.sin(rad), 0.0], mMatrix); // Translate to origin
   m.rotate(mMatrix, rad, [1.0, 1.0, 0.0], mMatrix); // Rotate around Y axis
-  // Draw rectangle elements
+
+  // Calculate mvpMatrix - Uses m, v, and p Matrices, and also generates the inverse for lighting calculations
   m.multiply(tmpMatrix, mMatrix, mvpMatrix); // MVP matrix
   m.inverse(mMatrix, invMatrix); // Inverse matrix
-  //#endregion
 
-  //#region Set Uniforms
-  gl.uniformMatrix4fv(uniLocations[0], false, mvpMatrix); // Set the uniform variable
-  gl.uniformMatrix4fv(uniLocations[1], false, mMatrix); // Set the model matrix uniform variable
-  gl.uniformMatrix4fv(uniLocations[2], false, invMatrix); // Set the uniform variable
-  gl.uniform3fv(uniLocations[3], lightPosition); // Set the light direction
-  gl.uniform3fv(uniLocations[4], eyeDirection); // Set the eye direction
-  gl.uniform4fv(uniLocations[5], [0.1, 0.1, 0.1, 1.0]); // Set the ambient color
-  //#endregion
+  // Set Uniforms - Sets all of the uniform variables for the shaders (f and v)
+  // mvpMatrix
+  gl.uniformMatrix4fv(uniLocations[0], false, mvpMatrix);
+  // mMatrix
+  gl.uniformMatrix4fv(uniLocations[1], false, mMatrix);
+  // invMatrix
+  gl.uniformMatrix4fv(uniLocations[2], false, invMatrix);
+  // lightPositon
+  gl.uniform3fv(uniLocations[3], lightPosition);
+  // eyeDirection
+  gl.uniform3fv(uniLocations[4], eyeDirection);
+  // ambientColor
+  gl.uniform4fv(uniLocations[5], [0.1, 0.1, 0.1, 1.0]);
 
-  // Draw the object
-  gl.drawElements(gl.TRIANGLES, indexes.length, gl.UNSIGNED_SHORT, 0);
+  // Draw Elements - Used to draw a mesh using an index buffer rather than just raw vertices.
+  gl.drawElements(
+    gl.TRIANGLES,
+    vertex_data.indices.length,
+    gl.UNSIGNED_SHORT,
+    0,
+  );
 
-  // Flush to screen
+  // Flush - Isn't required, ensures all issued commands are executed asap
   gl.flush();
 }
-//#endregion
-//#region Animation Loop
+
 function animationLoop() {
   drawFrame();
-  //setTimeout(animationLoop, 1000 / 60);
   requestAnimationFrame(animationLoop);
 }
-//#endregion
+
 animationLoop();
-//#endregion
 
-//#region Helper Functions
-
-//#region Shader Creation
 function createShader(id: string) {
   let shader: WebGLShader | null = null;
   // Get the shader source
@@ -287,9 +254,7 @@ function createShader(id: string) {
     return null;
   }
 }
-//#endregion
 
-//#region Program Creation
 function createProgram(vs: WebGLShader, fs: WebGLShader) {
   // create a program object
   const program = gl.createProgram() as WebGLProgram;
@@ -313,10 +278,7 @@ function createProgram(vs: WebGLShader, fs: WebGLShader) {
     return null;
   }
 }
-//#endregion
 
-//#region Buffer Creation
-//#region VBO Creation
 function createVBO(data: number[]) {
   // Create the buffer object
   const buffer = gl.createBuffer() as WebGLBuffer;
@@ -336,8 +298,7 @@ function createVBO(data: number[]) {
   // Return generated vbo
   return buffer;
 }
-//#endregion
-//#region IBO Creation
+
 function createIBO(data: number[]) {
   // create base buffer object
   const buffer = gl.createBuffer() as WebGLBuffer;
@@ -355,10 +316,7 @@ function createIBO(data: number[]) {
   // return generated ibo
   return buffer;
 }
-//#endregion
-//#endregion
 
-//#region Set Attribute
 function set_attribute(vbos: WebGLBuffer[], attLs: GLint[], attSs: number[]) {
   for (const i in vbos) {
     // Bind Buffer
@@ -369,9 +327,7 @@ function set_attribute(vbos: WebGLBuffer[], attLs: GLint[], attSs: number[]) {
     gl.vertexAttribPointer(attLs[i], attSs[i], gl.FLOAT, false, 0, 0);
   }
 }
-//#endregion
 
-//#region Color Conversion
 function hsva(h: number, s: number, v: number, a: number) {
   if (s > 1 || v > 1 || a > 1) {
     return;
@@ -394,6 +350,3 @@ function hsva(h: number, s: number, v: number, a: number) {
   }
   return color;
 }
-//#endregion
-
-//#endregion
