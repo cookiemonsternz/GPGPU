@@ -1,5 +1,5 @@
 import * as shapes from './shapes.js';
-import {matIV} from './minMatrix.js';
+import {matIV, qtnIV} from './minMatrix.js';
 
 // **** Initial Setup ****
 
@@ -13,6 +13,8 @@ const c: HTMLCanvasElement = cElement;
 
 c.width = 500;
 c.height = 500;
+
+c.addEventListener('mousemove', mouseMove, false);
 
 // WebGL Context - Gets the context, checks that the getting of the context didn't fail.
 const glContext = c.getContext('webgl') ?? c.getContext('experimental-webgl');
@@ -50,6 +52,10 @@ gl.frontFace(gl.CCW);
 gl.enable(gl.DEPTH_TEST);
 gl.depthFunc(gl.LEQUAL);
 
+// Alpha Blending - Enables alpha blending, the method used for transparency
+gl.enable(gl.BLEND);
+gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA); // just look at the site lol, w029
+
 // **** Vertex Attributes ****
 
 // Att. Location - basically index of the buffer, needs to be called after shader compilation
@@ -69,6 +75,7 @@ const positionAttStrides = 3; // vec3 for position, 3 floats
 const normalAttStrides = 3; // vec3 for normal, 3 floats
 const colorAttStrides = 4; // vec4 for color, 4 floats
 const textureCoordAttStrides = 2; // vec2 for texture coordinates, 2 floats
+// eslint-disable-next-line prettier/prettier
 const attStrides = [
   positionAttStrides,
   normalAttStrides,
@@ -78,7 +85,7 @@ const attStrides = [
 
 // Vertex Data - All the info for the vertexes
 
-const torus_data = shapes.torus(128, 128, 0.5, 1.0, [1.0, 1.0, 1.0, 1.0]);
+const torus_data = shapes.torus(128, 128, 0.5, 1.0, [1.0, 1.0, 1.0, 0.5]);
 
 const vertex_data = {
   position: torus_data[0],
@@ -130,10 +137,7 @@ const uniLocations: WebGLUniformLocation[] = [];
 
 for (let i = 0; i < uniformNames.length; i++) {
   // Get the uniform location, more webgl global states :sigh:
-  uniLocations[i] = gl.getUniformLocation(
-    prog,
-    uniformNames[i],
-  ) as WebGLUniformLocation;
+  uniLocations[i] = gl.getUniformLocation(prog, uniformNames[i]) as WebGLUniformLocation;
 
   if (uniLocations[i] === null) {
     console.error(`Uniform location for '${uniformNames[i]}' is null`);
@@ -142,25 +146,21 @@ for (let i = 0; i < uniformNames.length; i++) {
 }
 
 // Texture Uniforms - Seperate, idk if this is the best way bc I haven't actually tried to do multiple textures yet
-const textureUniformNames = ['texture'];
+// const textureUniformNames = ['texture'];
 
-const textureUniformLocations: WebGLUniformLocation[] = [];
+// const textureUniformLocations: WebGLUniformLocation[] = [];
 
-for (let i = 0; i < textureUniformNames.length; i++) {
-  textureUniformLocations[i] = gl.getUniformLocation(
-    prog,
-    textureUniformNames[i],
-  ) as WebGLUniformLocation;
+// for (let i = 0; i < textureUniformNames.length; i++) {
+//   textureUniformLocations[i] = gl.getUniformLocation(
+//     prog,
+//     textureUniformNames[i],
+//   ) as WebGLUniformLocation;
 
-  if (textureUniformLocations[i] === null) {
-    console.error(
-      `Texture uniform location for '${textureUniformNames[i]}' is null`,
-    );
-    throw new Error(
-      `Texture uniform location for '${textureUniformNames[i]}' not found`,
-    );
-  }
-}
+//   if (textureUniformLocations[i] === null) {
+//     console.error(`Texture uniform location for '${textureUniformNames[i]}' is null`);
+//     throw new Error(`Texture uniform location for '${textureUniformNames[i]}' not found`);
+//   }
+// }
 
 // **** MATRIX SETUP ****
 
@@ -194,47 +194,65 @@ m.multiply(pMatrix, vMatrix, tmpMatrix);
 // **** UNIFORMS INIT VALUES ****
 
 // Set the light position
-let lightPosition = [1.0, 0.5, 1.0];
+const lightPosition = [1.0, 0.5, 1.0];
 
 // Set the eye direction
 const eyeDirection = [0.0, 2.0, 3.0];
 
-// **** Texture ****
+// **** Texture **** ---- DISABLED ----
 
-// Load Textures - Need to load the src as html image, then bind to webgl, then attach to uniform
-const texture_srcs = ['../static/img.png'];
+// // Load Textures - Need to load the src as html image, then bind to webgl, then attach to uniform
+// const texture_srcs = ['../static/img.png'];
 
-// load async in parallel
-async function loadTextures(textures: string[]) {
-  const loadedTextures = await Promise.all(
-    textures.map(texture => createTexture(texture)),
-  );
-  return loadedTextures;
-}
+// // load async in parallel
+// async function loadTextures(texture_srcs: string[]) {
+//   const loadedTextures = await Promise.all(texture_srcs.map(src => createTexture(src)));
+//   return loadedTextures;
+// }
 
-let textures: WebGLTexture[] = [];
+// let textures: WebGLTexture[] = [];
 
-loadTextures(texture_srcs)
-  .then(loadedTextures => {
-    textures = loadedTextures.filter(
-      (tex): tex is WebGLTexture => tex !== null,
-    );
-    // Somethings stuffed, maybe non 2^x img size?
-    if (textures.length !== texture_srcs.length) {
-      console.warn('Some textures failed to load.');
-    }
-    // Somethings really stuffed
-    if (textures.length === 0 && texture_srcs.length > 0) {
-      throw new Error('Failed to load any textures.');
-    }
-    animationLoop();
-  })
-  .catch(error => {
-    console.error('Error loading textures:', error);
-  });
+// loadTextures(texture_srcs)
+//   .then(loadedTextures => {
+//     textures = loadedTextures.filter((tex): tex is WebGLTexture => tex !== null);
+//     // Somethings stuffed, maybe non 2^x img size?
+//     if (textures.length !== texture_srcs.length) {
+//       console.warn('Some textures failed to load.');
+//     }
+//     // Somethings really stuffed
+//     if (textures.length === 0 && texture_srcs.length > 0) {
+//       throw new Error('Failed to load any textures.');
+//     }
+//     animationLoop();
+//   })
+//   .catch(error => {
+//     console.error('Error loading textures:', error);
+//   });
 
 // Counter for current frame
 let count = 0;
+
+const q = new qtnIV();
+const qt = q.identity(q.create());
+
+// マウスムーブイベントに登録する処理
+function mouseMove(e: MouseEvent) {
+  const cw = c.width;
+  const ch = c.height;
+  const wh = 1 / Math.sqrt(cw * cw + ch * ch);
+  let x = e.clientX - c.offsetLeft - cw * 0.5;
+  let y = e.clientY - c.offsetTop - ch * 0.5;
+  let sq = Math.sqrt(x * x + y * y);
+  const r = sq * 2.0 * Math.PI * wh;
+  if (sq !== 1) {
+    sq = 1 / sq;
+    x *= sq;
+    y *= sq;
+  }
+  q.rotate(r, [y, x, 0.0], qt);
+}
+
+animationLoop(); // DELETE THIS IF USING TEXTURES, HAS TO USE ABOVE METHOD
 
 function drawFrame() {
   // Clear Screen - Clears the screen
@@ -246,12 +264,16 @@ function drawFrame() {
   count += 0.5;
 
   // Calc rotation in radians
-  const rad = ((count % 360) * Math.PI) / 180;
+  //const rad = ((count % 360) * Math.PI) / 180;
+  //const rad2 = ((count % 720) * Math.PI) / 360;
+  const qMatrix = m.identity(m.create());
+  q.toMatIV(qt, qMatrix);
 
-  lightPosition = [Math.sin(count / 100) * 2, 0.5, Math.cos(count / 100) * 2];
+  //lightPosition = [Math.sin(count / 100) * 2, 0.5, Math.cos(count / 100) * 2];
 
   // Calculate mMatrix - Controls the transformation of object
   m.identity(mMatrix);
+  m.multiply(mMatrix, qMatrix, mMatrix);
   // m.translate(mMatrix, [0.0, Math.sin(rad), 0.0], mMatrix); // Translate to origin
   // m.rotate(mMatrix, rad, [1.0, 1.0, 0.0], mMatrix); // Rotate around Y axis
 
@@ -272,18 +294,14 @@ function drawFrame() {
   gl.uniform3fv(uniLocations[4], eyeDirection);
   // ambientColor
   gl.uniform4fv(uniLocations[5], [0.1, 0.1, 0.1, 1.0]);
+  // Set Textures - Textures are like uniforms but have a bit more setup for some reason
   // texture
-  gl.activeTexture(gl.TEXTURE0);
-  gl.bindTexture(gl.TEXTURE_2D, textures[0]);
-  gl.uniform1i(textureUniformLocations[0], 0);
+  // gl.activeTexture(gl.TEXTURE0);
+  // gl.bindTexture(gl.TEXTURE_2D, textures[0]);
+  // gl.uniform1i(textureUniformLocations[0], 0);
 
   // Draw Elements - Used to draw a mesh using an index buffer rather than just raw vertices.
-  gl.drawElements(
-    gl.TRIANGLES,
-    vertex_data.indices.length,
-    gl.UNSIGNED_SHORT,
-    0,
-  );
+  gl.drawElements(gl.TRIANGLES, vertex_data.indices.length, gl.UNSIGNED_SHORT, 0);
 
   // Flush - Isn't required, ensures all issued commands are executed asap
   // gl.flush();
@@ -293,6 +311,8 @@ function animationLoop() {
   drawFrame();
   requestAnimationFrame(animationLoop);
 }
+
+// **** FUNCTIONS ****
 
 function createShader(id: string) {
   let shader: WebGLShader | null = null;
@@ -341,10 +361,7 @@ function createShader(id: string) {
     return shader;
   } else {
     console.error(
-      'Error compiling' +
-        scriptElement.type +
-        'shader: ' +
-        gl.getShaderInfoLog(shader),
+      'Error compiling' + scriptElement.type + 'shader: ' + gl.getShaderInfoLog(shader),
     );
     gl.deleteShader(shader);
     return null;
@@ -440,7 +457,7 @@ async function loadImage(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.onload = () => resolve(img);
-    img.onerror = e => reject(new Error(`Failed to load image: ${src}`));
+    img.onerror = e => reject(new Error(`Failed to load image: ${src}, error: ${e}`));
     img.src = src;
   });
 }
