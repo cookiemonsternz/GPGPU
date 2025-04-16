@@ -9,7 +9,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 };
 var _a;
 import * as shapes from './shapes.js';
-import { matIV } from './minMatrix.js';
+import { matIV, qtnIV } from './minMatrix.js';
 // **** Initial Setup ****
 // Canvas - Gets the canvas element + error handling so typescript doesn't bully me :(
 const cElement = document.getElementById('canvas');
@@ -50,6 +50,9 @@ gl.frontFace(gl.CCW);
 // Depth testing - Enables depth testing, draw objects in order of depth (kinda)
 gl.enable(gl.DEPTH_TEST);
 gl.depthFunc(gl.LEQUAL);
+// Alpha Blending - Enables alpha blending, the method used for transparency
+gl.enable(gl.BLEND);
+gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA); // just look at the site lol, w029
 // **** Vertex Attributes ****
 // Att. Location - basically index of the buffer, needs to be called after shader compilation
 const positionAttLocation = gl.getAttribLocation(prog, 'position');
@@ -67,6 +70,7 @@ const positionAttStrides = 3; // vec3 for position, 3 floats
 const normalAttStrides = 3; // vec3 for normal, 3 floats
 const colorAttStrides = 4; // vec4 for color, 4 floats
 const textureCoordAttStrides = 2; // vec2 for texture coordinates, 2 floats
+// eslint-disable-next-line prettier/prettier
 const attStrides = [
     positionAttStrides,
     normalAttStrides,
@@ -74,7 +78,7 @@ const attStrides = [
     textureCoordAttStrides,
 ];
 // Vertex Data - All the info for the vertexes
-const torus_data = shapes.torus(128, 128, 0.5, 1.0, [1.0, 1.0, 1.0, 1.0]);
+const torus_data = shapes.torus(128, 128, 0.5, 1.0, [1.0, 1.0, 1.0, 0.5]);
 const vertex_data = {
     position: torus_data[0],
     normal: torus_data[1],
@@ -122,15 +126,18 @@ for (let i = 0; i < uniformNames.length; i++) {
     }
 }
 // Texture Uniforms - Seperate, idk if this is the best way bc I haven't actually tried to do multiple textures yet
-const textureUniformNames = ['texture'];
-const textureUniformLocations = [];
-for (let i = 0; i < textureUniformNames.length; i++) {
-    textureUniformLocations[i] = gl.getUniformLocation(prog, textureUniformNames[i]);
-    if (textureUniformLocations[i] === null) {
-        console.error(`Texture uniform location for '${textureUniformNames[i]}' is null`);
-        throw new Error(`Texture uniform location for '${textureUniformNames[i]}' not found`);
-    }
-}
+// const textureUniformNames = ['texture'];
+// const textureUniformLocations: WebGLUniformLocation[] = [];
+// for (let i = 0; i < textureUniformNames.length; i++) {
+//   textureUniformLocations[i] = gl.getUniformLocation(
+//     prog,
+//     textureUniformNames[i],
+//   ) as WebGLUniformLocation;
+//   if (textureUniformLocations[i] === null) {
+//     console.error(`Texture uniform location for '${textureUniformNames[i]}' is null`);
+//     throw new Error(`Texture uniform location for '${textureUniformNames[i]}' not found`);
+//   }
+// }
 // **** MATRIX SETUP ****
 // Matrix class
 const m = new matIV();
@@ -159,35 +166,38 @@ m.multiply(pMatrix, vMatrix, tmpMatrix);
 let lightPosition = [1.0, 0.5, 1.0];
 // Set the eye direction
 const eyeDirection = [0.0, 2.0, 3.0];
-// **** Texture ****
-// Load Textures - Need to load the src as html image, then bind to webgl, then attach to uniform
-const texture_srcs = ['../static/img.png'];
-// load async in parallel
-function loadTextures(textures) {
-    return __awaiter(this, void 0, void 0, function* () {
-        const loadedTextures = yield Promise.all(textures.map(texture => createTexture(texture)));
-        return loadedTextures;
-    });
-}
-let textures = [];
-loadTextures(texture_srcs)
-    .then(loadedTextures => {
-    textures = loadedTextures.filter((tex) => tex !== null);
-    // Somethings stuffed, maybe non 2^x img size?
-    if (textures.length !== texture_srcs.length) {
-        console.warn('Some textures failed to load.');
-    }
-    // Somethings really stuffed
-    if (textures.length === 0 && texture_srcs.length > 0) {
-        throw new Error('Failed to load any textures.');
-    }
-    animationLoop();
-})
-    .catch(error => {
-    console.error('Error loading textures:', error);
-});
+// **** Texture **** ---- DISABLED ----
+// // Load Textures - Need to load the src as html image, then bind to webgl, then attach to uniform
+// const texture_srcs = ['../static/img.png'];
+// // load async in parallel
+// async function loadTextures(texture_srcs: string[]) {
+//   const loadedTextures = await Promise.all(texture_srcs.map(src => createTexture(src)));
+//   return loadedTextures;
+// }
+// let textures: WebGLTexture[] = [];
+// loadTextures(texture_srcs)
+//   .then(loadedTextures => {
+//     textures = loadedTextures.filter((tex): tex is WebGLTexture => tex !== null);
+//     // Somethings stuffed, maybe non 2^x img size?
+//     if (textures.length !== texture_srcs.length) {
+//       console.warn('Some textures failed to load.');
+//     }
+//     // Somethings really stuffed
+//     if (textures.length === 0 && texture_srcs.length > 0) {
+//       throw new Error('Failed to load any textures.');
+//     }
+//     animationLoop();
+//   })
+//   .catch(error => {
+//     console.error('Error loading textures:', error);
+//   });
 // Counter for current frame
 let count = 0;
+const q = new qtnIV();
+const xQuaternion = q.identity(q.create());
+const camPosition = [0.0, 0.0, 10.0];
+const camUpPosition = [0.0, 1.0, 0.0];
+animationLoop(); // DELETE THIS IF USING TEXTURES, HAS TO USE ABOVE METHOD
 function drawFrame() {
     // Clear Screen - Clears the screen
     gl.clearColor(0.0, 0.0, 0.0, 1.0);
@@ -196,8 +206,15 @@ function drawFrame() {
     // Increment count
     count += 0.5;
     // Calc rotation in radians
-    const rad = ((count % 360) * Math.PI) / 180;
-    lightPosition = [Math.sin(count / 100) * 2, 0.5, Math.cos(count / 100) * 2];
+    //const rad = ((count % 360) * Math.PI) / 180;
+    const rad2 = ((count % 720) * Math.PI) / 360;
+    q.rotate(rad2, [1, 0, 0], xQuaternion);
+    q.toVecIII([0.0, 0.0, 10.0], xQuaternion, camPosition);
+    q.toVecIII([0.0, 1.0, 0.0], xQuaternion, camUpPosition);
+    m.lookAt(camPosition, center, camUpPosition, vMatrix); // Update view matrix
+    m.perspective(fov, aspect, near, far, pMatrix); // Update projection matrix
+    m.multiply(pMatrix, vMatrix, tmpMatrix); // Update tmpMatrix
+    //lightPosition = [Math.sin(count / 100) * 2, 0.5, Math.cos(count / 100) * 2];
     // Calculate mMatrix - Controls the transformation of object
     m.identity(mMatrix);
     // m.translate(mMatrix, [0.0, Math.sin(rad), 0.0], mMatrix); // Translate to origin
@@ -218,10 +235,11 @@ function drawFrame() {
     gl.uniform3fv(uniLocations[4], eyeDirection);
     // ambientColor
     gl.uniform4fv(uniLocations[5], [0.1, 0.1, 0.1, 1.0]);
+    // Set Textures - Textures are like uniforms but have a bit more setup for some reason
     // texture
-    gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, textures[0]);
-    gl.uniform1i(textureUniformLocations[0], 0);
+    // gl.activeTexture(gl.TEXTURE0);
+    // gl.bindTexture(gl.TEXTURE_2D, textures[0]);
+    // gl.uniform1i(textureUniformLocations[0], 0);
     // Draw Elements - Used to draw a mesh using an index buffer rather than just raw vertices.
     gl.drawElements(gl.TRIANGLES, vertex_data.indices.length, gl.UNSIGNED_SHORT, 0);
     // Flush - Isn't required, ensures all issued commands are executed asap
@@ -231,6 +249,7 @@ function animationLoop() {
     drawFrame();
     requestAnimationFrame(animationLoop);
 }
+// **** FUNCTIONS ****
 function createShader(id) {
     let shader = null;
     // Get the shader source
@@ -277,10 +296,7 @@ function createShader(id) {
         return shader;
     }
     else {
-        console.error('Error compiling' +
-            scriptElement.type +
-            'shader: ' +
-            gl.getShaderInfoLog(shader));
+        console.error('Error compiling' + scriptElement.type + 'shader: ' + gl.getShaderInfoLog(shader));
         gl.deleteShader(shader);
         return null;
     }
@@ -361,7 +377,7 @@ function loadImage(src) {
         return new Promise((resolve, reject) => {
             const img = new Image();
             img.onload = () => resolve(img);
-            img.onerror = e => reject(new Error(`Failed to load image: ${src}`));
+            img.onerror = e => reject(new Error(`Failed to load image: ${src}, error: ${e}`));
             img.src = src;
         });
     });

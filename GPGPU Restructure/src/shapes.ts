@@ -34,8 +34,8 @@ export function torus(
   }
   const texCoords = Array((pos.length / 3) * 2);
   for (let i = 0; i < texCoords.length; i += 2) {
-    texCoords[i] = ((i / 2) % ((column + 1) * 2)) / (column * 2);
-    texCoords[i + 1] = Math.floor(i / 2 / (column + 1)) / row;
+    texCoords[i] = i / texCoords.length;
+    texCoords[i + 1] = i / texCoords.length;
   }
   return [pos, nor, col, idx, texCoords];
 }
