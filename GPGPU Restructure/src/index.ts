@@ -14,8 +14,6 @@ const c: HTMLCanvasElement = cElement;
 c.width = 500;
 c.height = 500;
 
-c.addEventListener('mousemove', mouseMove, false);
-
 // WebGL Context - Gets the context, checks that the getting of the context didn't fail.
 const glContext = c.getContext('webgl') ?? c.getContext('experimental-webgl');
 if (!glContext) {
@@ -232,26 +230,6 @@ const eyeDirection = [0.0, 2.0, 3.0];
 // Counter for current frame
 let count = 0;
 
-const q = new qtnIV();
-const qt = q.identity(q.create());
-
-// マウスムーブイベントに登録する処理
-function mouseMove(e: MouseEvent) {
-  const cw = c.width;
-  const ch = c.height;
-  const wh = 1 / Math.sqrt(cw * cw + ch * ch);
-  let x = e.clientX - c.offsetLeft - cw * 0.5;
-  let y = e.clientY - c.offsetTop - ch * 0.5;
-  let sq = Math.sqrt(x * x + y * y);
-  const r = sq * 2.0 * Math.PI * wh;
-  if (sq !== 1) {
-    sq = 1 / sq;
-    x *= sq;
-    y *= sq;
-  }
-  q.rotate(r, [y, x, 0.0], qt);
-}
-
 animationLoop(); // DELETE THIS IF USING TEXTURES, HAS TO USE ABOVE METHOD
 
 function drawFrame() {
@@ -266,14 +244,11 @@ function drawFrame() {
   // Calc rotation in radians
   //const rad = ((count % 360) * Math.PI) / 180;
   //const rad2 = ((count % 720) * Math.PI) / 360;
-  const qMatrix = m.identity(m.create());
-  q.toMatIV(qt, qMatrix);
 
   //lightPosition = [Math.sin(count / 100) * 2, 0.5, Math.cos(count / 100) * 2];
 
   // Calculate mMatrix - Controls the transformation of object
   m.identity(mMatrix);
-  m.multiply(mMatrix, qMatrix, mMatrix);
   // m.translate(mMatrix, [0.0, Math.sin(rad), 0.0], mMatrix); // Translate to origin
   // m.rotate(mMatrix, rad, [1.0, 1.0, 0.0], mMatrix); // Rotate around Y axis
 

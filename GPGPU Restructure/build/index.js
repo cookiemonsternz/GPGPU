@@ -9,7 +9,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 };
 var _a;
 import * as shapes from './shapes.js';
-import { matIV, qtnIV } from './minMatrix.js';
+import { matIV } from './minMatrix.js';
 // **** Initial Setup ****
 // Canvas - Gets the canvas element + error handling so typescript doesn't bully me :(
 const cElement = document.getElementById('canvas');
@@ -20,7 +20,6 @@ if (!(cElement instanceof HTMLCanvasElement)) {
 const c = cElement;
 c.width = 500;
 c.height = 500;
-c.addEventListener('mousemove', mouseMove, false);
 // WebGL Context - Gets the context, checks that the getting of the context didn't fail.
 const glContext = (_a = c.getContext('webgl')) !== null && _a !== void 0 ? _a : c.getContext('experimental-webgl');
 if (!glContext) {
@@ -194,24 +193,6 @@ const eyeDirection = [0.0, 2.0, 3.0];
 //   });
 // Counter for current frame
 let count = 0;
-const q = new qtnIV();
-const qt = q.identity(q.create());
-// マウスムーブイベントに登録する処理
-function mouseMove(e) {
-    const cw = c.width;
-    const ch = c.height;
-    const wh = 1 / Math.sqrt(cw * cw + ch * ch);
-    let x = e.clientX - c.offsetLeft - cw * 0.5;
-    let y = e.clientY - c.offsetTop - ch * 0.5;
-    let sq = Math.sqrt(x * x + y * y);
-    const r = sq * 2.0 * Math.PI * wh;
-    if (sq !== 1) {
-        sq = 1 / sq;
-        x *= sq;
-        y *= sq;
-    }
-    q.rotate(r, [y, x, 0.0], qt);
-}
 animationLoop(); // DELETE THIS IF USING TEXTURES, HAS TO USE ABOVE METHOD
 function drawFrame() {
     // Clear Screen - Clears the screen
@@ -223,12 +204,9 @@ function drawFrame() {
     // Calc rotation in radians
     //const rad = ((count % 360) * Math.PI) / 180;
     //const rad2 = ((count % 720) * Math.PI) / 360;
-    const qMatrix = m.identity(m.create());
-    q.toMatIV(qt, qMatrix);
     //lightPosition = [Math.sin(count / 100) * 2, 0.5, Math.cos(count / 100) * 2];
     // Calculate mMatrix - Controls the transformation of object
     m.identity(mMatrix);
-    m.multiply(mMatrix, qMatrix, mMatrix);
     // m.translate(mMatrix, [0.0, Math.sin(rad), 0.0], mMatrix); // Translate to origin
     // m.rotate(mMatrix, rad, [1.0, 1.0, 0.0], mMatrix); // Rotate around Y axis
     // Calculate mvpMatrix - Uses m, v, and p Matrices, and also generates the inverse for lighting calculations
