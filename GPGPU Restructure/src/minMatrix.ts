@@ -294,6 +294,41 @@ export class matIV {
     dest[15] = 0;
     return dest;
   }
+  ortho(
+    left: number,
+    right: number,
+    bottom: number,
+    top: number,
+    near: number,
+    far: number,
+    dest: Float32Array,
+  ): Float32Array {
+    const lr = 1 / (left - right);
+    const bt = 1 / (bottom - top);
+    const nf = 1 / (near - far);
+
+    dest[0] = -2 * lr;
+    dest[1] = 0;
+    dest[2] = 0;
+    dest[3] = 0;
+
+    dest[4] = 0;
+    dest[5] = -2 * bt;
+    dest[6] = 0;
+    dest[7] = 0;
+
+    dest[8] = 0;
+    dest[9] = 0;
+    dest[10] = 2 * nf;
+    dest[11] = 0;
+
+    dest[12] = (left + right) * lr;
+    dest[13] = (top + bottom) * bt;
+    dest[14] = (far + near) * nf;
+    dest[15] = 1;
+
+    return dest;
+  }
   transpose(mat: Float32Array, dest: Float32Array): Float32Array {
     dest[0] = mat[0];
     dest[1] = mat[4];

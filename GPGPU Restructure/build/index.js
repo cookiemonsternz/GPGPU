@@ -8,7 +8,6 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 var _a;
-import * as shapes from './shapes.js';
 import { matIV } from './minMatrix.js';
 // **** Initial Setup ****
 // Canvas - Gets the canvas element + error handling so typescript doesn't bully me :(
@@ -27,106 +26,89 @@ if (!glContext) {
     throw new Error('WebGL context unavailable');
 }
 const gl = glContext;
+const ext = gl.getExtension('ANGLE_instanced_arrays');
+if (!ext) {
+    console.error('ANGLE_instanced_arrays extension not supported');
+    throw new Error('ANGLE_instanced_arrays extension not supported');
+}
 // Clear Screen - Sets the globals for clear color and depth, and then clears the screen / depth buffer
 gl.clearColor(0.0, 0.0, 0.0, 1.0);
 gl.clearDepth(1.0);
 gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+// WALKER UPDATE PROGRAM
 // Create Shaders - Creates and compiles the shaders
-const v_shader = createShader('vs');
-const f_shader = createShader('fs');
-if (!v_shader || !f_shader) {
+const walker_v_shader = createShader('wvs');
+const walker_f_shader = createShader('wfs');
+if (!walker_v_shader || !walker_f_shader) {
     console.error('Failed to create shaders');
     throw new Error('Shader creation failed'); // Stop
 }
-// Create Program - Responsible for linking together v and f shader, as well
-const prog = createProgram(v_shader, f_shader);
-if (!prog) {
+// Create Program 1 - walker update program
+const walker_update_prog = createProgram(walker_v_shader, walker_f_shader);
+if (!walker_update_prog) {
     console.error('Failed to create program');
     throw new Error('Program creation failed'); // Stop
 }
-// Culling - Enables culling of back faces, so no back faces drawn duh
-// gl.enable(gl.CULL_FACE);
-// gl.frontFace(gl.CCW);
-// Depth testing - Enables depth testing, draw objects in order of depth (kinda)
-gl.enable(gl.DEPTH_TEST);
-gl.depthFunc(gl.LEQUAL);
-// Alpha Blending - Enables alpha blending, the method used for transparency
-gl.enable(gl.BLEND);
-gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA); // just look at the site lol, w029
+// WALKER RENDER PROGRAM
+// Create Shaders - Creates and compiles the shaders
+const render_v_shader = createShader('rvs');
+const render_f_shader = createShader('rfs');
+if (!render_v_shader || !render_f_shader) {
+    console.error('Failed to create shaders');
+    throw new Error('Shader creation failed'); // Stop
+}
+// Create Program 2 - walker render program
+const render_prog = createProgram(render_v_shader, render_f_shader);
+if (!render_prog) {
+    console.error('Failed to create program');
+    throw new Error('Program creation failed'); // Stop
+}
 // **** Vertex Attributes ****
-// Att. Location - basically index of the buffer, needs to be called after shader compilation
-const positionAttLocation = gl.getAttribLocation(prog, 'position');
-const normalAttLocation = gl.getAttribLocation(prog, 'normal');
-const colorAttLocation = gl.getAttribLocation(prog, 'color');
-const textureCoordAttLocation = gl.getAttribLocation(prog, 'textureCoord');
-const attLocations = [
-    positionAttLocation,
-    normalAttLocation,
-    colorAttLocation,
-    textureCoordAttLocation,
-];
 // Att. Stride - How many numbers in each index of the buffer, e.g, 3 for vec3, etc...
 const positionAttStrides = 3; // vec3 for position, 3 floats
-const normalAttStrides = 3; // vec3 for normal, 3 floats
-const colorAttStrides = 4; // vec4 for color, 4 floats
 const textureCoordAttStrides = 2; // vec2 for texture coordinates, 2 floats
+const indexAttStrides = 1; // vec1 for index, 1 float
 // eslint-disable-next-line prettier/prettier
-const attStrides = [
+const walkerAttStrides = [
     positionAttStrides,
-    normalAttStrides,
-    colorAttStrides,
     textureCoordAttStrides,
 ];
-// Vertex Data - All the info for the vertexes
-const torus_data = shapes.torus(128, 128, 0.5, 1.0, [1.0, 1.0, 1.0, 0.5]);
-const vertex_data = {
-    position: torus_data[0],
-    normal: torus_data[1],
-    color: torus_data[2],
-    textureCoordinates: torus_data[4],
-    indices: torus_data[3],
-};
+// Walker Update Program
+// Att. Location - basically index of the buffer, needs to be called after shader compilation
+const positionAttLocation = gl.getAttribLocation(walker_update_prog, 'position');
+const textureCoordAttLocation = gl.getAttribLocation(walker_update_prog, 'textureCoord');
+const walkerAttLocations = [positionAttLocation, textureCoordAttLocation];
 // basic rectangle, blue, would format it but prettier doesn't like it and tbh its not worth it
-const vertex_data_plane = {
+const vertex_data = {
     position: [-1.0, -1.0, 0.0, 1.0, -1.0, 0.0, 1.0, 1.0, 0.0, -1.0, 1.0, 0.0],
-    normal: [0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0],
-    color: Array(16).fill(1.0),
     textureCoordinates: [0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0],
     indices: [0, 1, 2, 2, 3, 0],
 };
 // VBO's - Vertex Buffer Objects, basically just putting the data into webgl
 const vbos = Array(4);
 vbos[0] = createVBO(vertex_data.position);
-vbos[1] = createVBO(vertex_data.normal);
-vbos[2] = createVBO(vertex_data.color);
-vbos[3] = createVBO(vertex_data.textureCoordinates);
-const vbosPlane = Array(4);
-vbosPlane[0] = createVBO(vertex_data_plane.position);
-vbosPlane[1] = createVBO(vertex_data_plane.normal);
-vbosPlane[2] = createVBO(vertex_data_plane.color);
-vbosPlane[3] = createVBO(vertex_data_plane.textureCoordinates);
-// Bind vbos to attributes
-set_attribute(vbosPlane, attLocations, attStrides);
+vbos[1] = createVBO(vertex_data.textureCoordinates);
 // **** IBO ****
 const ibos = Array(1);
 ibos[0] = createIBO(vertex_data.indices);
-ibos[1] = createIBO(vertex_data_plane.indices);
 // Bind IBO to target
-gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ibos[1]);
+gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ibos[0]);
 // **** UNIFORM LOCATIONS ****
-const uniformNames = [
-    'mvpMatrix',
-    'mMatrix',
-    'invMatrix',
-    'lightPosition',
-    'eyeDirection',
-    'ambientColor',
-];
-const uniLocations = [];
+const uniformNames = ['mvpMatrix'];
+const updateUniLocations = [];
 for (let i = 0; i < uniformNames.length; i++) {
     // Get the uniform location, more webgl global states :sigh:
-    uniLocations[i] = gl.getUniformLocation(prog, uniformNames[i]);
-    if (uniLocations[i] === null) {
+    updateUniLocations[i] = gl.getUniformLocation(walker_update_prog, uniformNames[i]);
+    if (updateUniLocations[i] === null) {
+        console.error(`Uniform location for '${uniformNames[i]}' is null`);
+        throw new Error(`Uniform location for '${uniformNames[i]}' not found`);
+    }
+}
+const renderUniLocations = [];
+for (let i = 0; i < uniformNames.length; i++) {
+    // Get the uniform location, more webgl global states :sigh:
+    renderUniLocations[i] = gl.getUniformLocation(render_prog, uniformNames[i]);
+    if (renderUniLocations[i] === null) {
         console.error(`Uniform location for '${uniformNames[i]}' is null`);
         throw new Error(`Uniform location for '${uniformNames[i]}' not found`);
     }
@@ -155,121 +137,127 @@ const tmpMatrix = m.identity(m.create()); // View * Projection matrix (used so w
 const mvpMatrix = m.identity(m.create()); // Projection * View * Model matrix, passed to shaders
 const invMatrix = m.identity(m.create()); // Inverse mvpMatrix for lighting calculations, so light doesn't also have model transform applied
 // vMatrix - Contains information about the camera
-const eye = [0.0, 2.0, 3.0]; // Camera position
+const eye = [0.0, 0.0, 1.0]; // Camera position
 const center = [0.0, 0.0, 0.0]; // Look at point
 const up = [0.0, 1.0, 0.0]; // Up direction
 m.lookAt(eye, center, up, vMatrix);
 // pMatrix - Contains the projection transformation, fov and clipping planes
-const fov = 90; // Field of view
-const aspect = c.width / c.height; // Aspect ratio
-const near = 0.1; // Near clipping plane
-const far = 100; // Far clipping plane
-m.perspective(fov, aspect, near, far, pMatrix);
+// const fov = 90; // Field of view
+// const aspect = c.width / c.height; // Aspect ratio
+// const near = 0.1; // Near clipping plane
+// const far = 100; // Far clipping plane
+// m.perspective(fov, aspect, near, far, pMatrix);
+m.ortho(-1, 1, -1, 1, -1, 1, pMatrix); // Orthographic projection
 // Calculate tmpMatrix - Does this here instead of render loop so not needed to be done every frame
 m.multiply(pMatrix, vMatrix, tmpMatrix);
+// calculate mvpMatrix - This is the final matrix that is passed to the shader
+m.multiply(tmpMatrix, mMatrix, mvpMatrix);
 // **** UNIFORMS INIT VALUES ****
-// Set the light position
-const lightPosition = [1.0, 0.5, 1.0];
-// Set the eye direction
-const eyeDirection = [0.0, 2.0, 3.0];
 // **** Texture **** ---- DISABLED ----
-// // Load Textures - Need to load the src as html image, then bind to webgl, then attach to uniform
-// const texture_srcs = ['../static/img.png'];
-// // load async in parallel
-// async function loadTextures(texture_srcs: string[]) {
-//   const loadedTextures = await Promise.all(texture_srcs.map(src => createTexture(src)));
-//   return loadedTextures;
-// }
-// let textures: WebGLTexture[] = [];
-// loadTextures(texture_srcs)
-//   .then(loadedTextures => {
-//     textures = loadedTextures.filter((tex): tex is WebGLTexture => tex !== null);
-//     // Somethings stuffed, maybe non 2^x img size?
-//     if (textures.length !== texture_srcs.length) {
-//       console.warn('Some textures failed to load.');
-//     }
-//     // Somethings really stuffed
-//     if (textures.length === 0 && texture_srcs.length > 0) {
-//       throw new Error('Failed to load any textures.');
-//     }
-//     animationLoop();
-//   })
-//   .catch(error => {
-//     console.error('Error loading textures:', error);
-//   });
-const framebufferElements = createFramebuffer(32, 32);
-const framebuffer = framebufferElements.f;
-const depthBuffer = framebufferElements.d;
-const fTexture = framebufferElements.t;
-let count = 0.0; // Used for rotation
-animationLoop(); // DELETE THIS IF USING TEXTURES, HAS TO USE ABOVE METHOD
+// Load Textures - Need to load the src as html image, then bind to webgl, then attach to uniform
+const texture_srcs = ['../static/init_walkers.png'];
+// load async in parallel
+function loadTextures(texture_srcs) {
+    return __awaiter(this, void 0, void 0, function* () {
+        const loadedTextures = yield Promise.all(texture_srcs.map(src => createTexture(src)));
+        return loadedTextures;
+    });
+}
+let textures = [];
+loadTextures(texture_srcs)
+    .then(loadedTextures => {
+    textures = loadedTextures.filter((tex) => tex !== null);
+    // Somethings stuffed, maybe non 2^x img size?
+    if (textures.length !== texture_srcs.length) {
+        console.warn('Some textures failed to load.');
+    }
+    // Somethings really stuffed
+    if (textures.length === 0 && texture_srcs.length > 0) {
+        throw new Error('Failed to load any textures.');
+    }
+    animationLoop();
+})
+    .catch(error => {
+    console.error('Error loading textures:', error);
+});
+const textureDim = 128;
+const texture_size = textureDim * 4;
+const walker_count = textureDim * textureDim;
+const framebuffers = [];
+framebuffers.push(createFramebuffer(texture_size, texture_size), createFramebuffer(texture_size, texture_size));
+// Setup buffer for rendering points
+// Render Program
+// eslint-disable-next-line prettier/prettier
+const renderAttStrides = [
+    1
+];
+// Att. Location - basically index of the buffer, needs to be called after shader compilation
+// const renderPositionAttLocation = gl.getAttribLocation(render_prog, 'position');
+const renderIndexAttLocation = gl.getAttribLocation(render_prog, 'a_index');
+const renderAttLocations = [renderIndexAttLocation];
+console.log('renderAttLocations', renderAttLocations);
+const indices = Array(walker_count);
+for (let i = 0; i < walker_count; i++)
+    indices[i] = i;
+const pointPositions = Array(walker_count * 3);
+pointPositions.fill(0);
+const renderVBOS = Array(3);
+renderVBOS[0] = createVBO(indices);
+let i = 0;
+let doFirstFrame = true;
 function drawFrame() {
-    count += 0.01; // Increment count for rotation
-    // Calculate mMatrix - Controls the transformation of object
-    m.identity(mMatrix);
-    m.rotate(mMatrix, count, [0.0, 1.0, 0.0], mMatrix); // Rotate around y axis
-    // Calculate mvpMatrix - Uses m, v, and p Matrices, and also generates the inverse for lighting calculations
-    m.multiply(tmpMatrix, mMatrix, mvpMatrix); // MVP matrix
-    m.inverse(mMatrix, invMatrix); // Inverse matrix
-    // draw plane to framebuffer
-    gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
-    gl.viewport(0, 0, 32, 32); // Set viewport to framebuffer size
-    gl.clearColor(0.0, 0.5, 0.0, 1.0);
-    gl.clearDepth(1.0);
+    const ni = i;
+    i = (i + 1) % 2;
+    // Draw to frame buffer first
+    // Draw to current buffer, using previous texture as draw source
+    gl.useProgram(walker_update_prog);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffers[i].f);
+    gl.viewport(0, 0, texture_size, texture_size);
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-    // Set Uniforms - Sets all of the uniform variables for the shaders (f and v)
-    // mvpMatrix
-    gl.uniformMatrix4fv(uniLocations[0], false, mvpMatrix);
-    // mMatrix
-    gl.uniformMatrix4fv(uniLocations[1], false, mMatrix);
-    // invMatrix
-    gl.uniformMatrix4fv(uniLocations[2], false, invMatrix);
-    // lightPositon
-    gl.uniform3fv(uniLocations[3], lightPosition);
-    // eyeDirection
-    gl.uniform3fv(uniLocations[4], eyeDirection);
-    // ambientColor
-    gl.uniform4fv(uniLocations[5], [0.5, 0.1, 0.1, 1.0]);
-    gl.drawElements(gl.TRIANGLES, vertex_data_plane.indices.length, gl.UNSIGNED_SHORT, 0);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, null); // Unbind framebuffer
-    // Draw Plane to no framebuffer, so we can see the plane. Set texture to the framebuffer texture
-    // gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
-    gl.viewport(0, 0, c.width, c.height); // Set viewport to canvas size
-    // Clear Screen - Clears the screen
-    gl.clearColor(0.0, 0.0, 0.5, 1.0);
-    gl.clearDepth(1.0);
-    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-    m.identity(mMatrix);
-    // m.rotate(mMatrix, count, [0.0, 1.0, 0.0], mMatrix); // Rotate around y axis
-    // Calculate mvpMatrix - Uses m, v, and p Matrices, and also generates the inverse for lighting calculations
-    m.multiply(tmpMatrix, mMatrix, mvpMatrix); // MVP matrix
-    m.inverse(mMatrix, invMatrix); // Inverse matrix
-    // Set Uniforms - Sets all of the uniform variables for the shaders (f and v)
-    // mvpMatrix
-    gl.uniformMatrix4fv(uniLocations[0], false, mvpMatrix);
-    // mMatrix
-    gl.uniformMatrix4fv(uniLocations[1], false, mMatrix);
-    // invMatrix
-    gl.uniformMatrix4fv(uniLocations[2], false, invMatrix);
-    // lightPositon
-    gl.uniform3fv(uniLocations[3], lightPosition);
-    // eyeDirection
-    gl.uniform3fv(uniLocations[4], eyeDirection);
-    // ambientColor
-    gl.uniform4fv(uniLocations[5], [0.1, 0.1, 0.1, 1.0]);
-    // Set Textures - Textures are like uniforms but have a bit more setup for some reason
-    // texture
-    gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, fTexture);
-    gl.uniform1i(gl.getUniformLocation(prog, 'texture'), 0);
-    // Draw Elements - Used to draw a mesh using an index buffer rather than just raw vertices.
-    gl.drawElements(gl.TRIANGLES, vertex_data_plane.indices.length, gl.UNSIGNED_SHORT, 0);
-    // unbind texture
+    // Texture 0 = previous frame Data
+    if (doFirstFrame) {
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, textures[0]);
+        gl.uniform1i(gl.getUniformLocation(walker_update_prog, 'texture'), 0);
+        doFirstFrame = false;
+    }
+    else {
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, framebuffers[ni].t);
+        gl.uniform1i(gl.getUniformLocation(walker_update_prog, 'texture'), 0);
+    }
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ibos[0]);
+    set_attribute(vbos, walkerAttLocations, walkerAttStrides);
+    gl.uniformMatrix4fv(updateUniLocations[0], false, mvpMatrix);
+    // Uniform tex coord
+    gl.drawElements(gl.TRIANGLES, vertex_data.indices.length, gl.UNSIGNED_SHORT, 0);
     gl.bindTexture(gl.TEXTURE_2D, null);
-    // unbind framebuffer
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-    // Flush - Isn't required, ensures all issued commands are executed asap
-    // gl.flush();
+    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+    // Render scene
+    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+    gl.viewport(0, 0, c.width, c.height);
+    gl.useProgram(render_prog);
+    // Texture 0 = current frame Data
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, framebuffers[i].t);
+    gl.uniform1i(gl.getUniformLocation(render_prog, 'texture'), 0);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, null);
+    // set_attribute(renderVBOS, renderAttLocations, renderAttStrides);
+    // Bind the VBO for the index attribute
+    gl.bindBuffer(gl.ARRAY_BUFFER, renderVBOS[0]);
+    gl.enableVertexAttribArray(renderAttLocations[0]);
+    gl.vertexAttribPointer(renderAttLocations[0], renderAttStrides[0], gl.FLOAT, false, 0, 0);
+    if (!ext) {
+        console.error('ANGLE_instanced_arrays extension lost!');
+        return; // Or throw error
+    }
+    ext.vertexAttribDivisorANGLE(renderAttLocations[0], 1); // Enable instancing for index attribute
+    // Set the number of instances to draw
+    gl.uniformMatrix4fv(renderUniLocations[0], false, mvpMatrix);
+    ext.drawArraysInstancedANGLE(gl.POINTS, 0, 1, walker_count);
+    ext.vertexAttribDivisorANGLE(renderAttLocations[0], 0);
 }
 function animationLoop() {
     drawFrame();
@@ -415,7 +403,10 @@ function createTexture(src) {
             const tex = gl.createTexture();
             gl.bindTexture(gl.TEXTURE_2D, tex);
             gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
-            gl.generateMipmap(gl.TEXTURE_2D);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
             gl.bindTexture(gl.TEXTURE_2D, null);
             return tex;
         }
