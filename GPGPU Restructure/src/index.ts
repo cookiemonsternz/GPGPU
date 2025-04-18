@@ -43,8 +43,8 @@ if (!prog) {
 }
 
 // Culling - Enables culling of back faces, so no back faces drawn duh
-gl.enable(gl.CULL_FACE);
-gl.frontFace(gl.CCW);
+// gl.enable(gl.CULL_FACE);
+// gl.frontFace(gl.CCW);
 
 // Depth testing - Enables depth testing, draw objects in order of depth (kinda)
 gl.enable(gl.DEPTH_TEST);
@@ -94,13 +94,13 @@ const vertex_data = {
 };
 
 // basic rectangle, blue, would format it but prettier doesn't like it and tbh its not worth it
-// const vertex_data = {
-//   position: [-1.0, -1.0, 0.0, 1.0, -1.0, 0.0, 1.0, 1.0, 0.0, -1.0, 1.0, 0.0],
-//   normal: [0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0],
-//   color: Array(16).fill(1.0),
-//   textureCoordinates: [0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0],
-//   indices: [0, 1, 2, 2, 3, 0],
-// };
+const vertex_data_plane = {
+  position: [-1.0, -1.0, 0.0, 1.0, -1.0, 0.0, 1.0, 1.0, 0.0, -1.0, 1.0, 0.0],
+  normal: [0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0],
+  color: Array(16).fill(1.0),
+  textureCoordinates: [0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0],
+  indices: [0, 1, 2, 2, 3, 0],
+};
 
 // VBO's - Vertex Buffer Objects, basically just putting the data into webgl
 const vbos = Array(4);
@@ -109,16 +109,23 @@ vbos[1] = createVBO(vertex_data.normal);
 vbos[2] = createVBO(vertex_data.color);
 vbos[3] = createVBO(vertex_data.textureCoordinates);
 
+const vbosPlane = Array(4);
+vbosPlane[0] = createVBO(vertex_data_plane.position);
+vbosPlane[1] = createVBO(vertex_data_plane.normal);
+vbosPlane[2] = createVBO(vertex_data_plane.color);
+vbosPlane[3] = createVBO(vertex_data_plane.textureCoordinates);
+
 // Bind vbos to attributes
-set_attribute(vbos, attLocations, attStrides);
+set_attribute(vbosPlane, attLocations, attStrides);
 
 // **** IBO ****
 
 const ibos = Array(1);
 ibos[0] = createIBO(vertex_data.indices);
+ibos[1] = createIBO(vertex_data_plane.indices);
 
 // Bind IBO to target
-gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ibos[0]);
+gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ibos[1]);
 
 // **** UNIFORM LOCATIONS ****
 
@@ -226,32 +233,55 @@ const eyeDirection = [0.0, 2.0, 3.0];
 //   .catch(error => {
 //     console.error('Error loading textures:', error);
 //   });
+const framebufferElements = createFramebuffer(32, 32);
+const framebuffer = framebufferElements.f;
+const depthBuffer = framebufferElements.d;
+const fTexture = framebufferElements.t;
 
-// Counter for current frame
-let count = 0;
+let count = 0.0; // Used for rotation
 
 animationLoop(); // DELETE THIS IF USING TEXTURES, HAS TO USE ABOVE METHOD
 
 function drawFrame() {
+  count += 0.01; // Increment count for rotation
+  // Calculate mMatrix - Controls the transformation of object
+  m.identity(mMatrix);
+  m.rotate(mMatrix, count, [0.0, 1.0, 0.0], mMatrix); // Rotate around y axis
+  // Calculate mvpMatrix - Uses m, v, and p Matrices, and also generates the inverse for lighting calculations
+  m.multiply(tmpMatrix, mMatrix, mvpMatrix); // MVP matrix
+  m.inverse(mMatrix, invMatrix); // Inverse matrix
+  // draw plane to framebuffer
+  gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
+  gl.viewport(0, 0, 32, 32); // Set viewport to framebuffer size
+  gl.clearColor(0.0, 0.5, 0.0, 1.0);
+  gl.clearDepth(1.0);
+  gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+  // Set Uniforms - Sets all of the uniform variables for the shaders (f and v)
+  // mvpMatrix
+  gl.uniformMatrix4fv(uniLocations[0], false, mvpMatrix);
+  // mMatrix
+  gl.uniformMatrix4fv(uniLocations[1], false, mMatrix);
+  // invMatrix
+  gl.uniformMatrix4fv(uniLocations[2], false, invMatrix);
+  // lightPositon
+  gl.uniform3fv(uniLocations[3], lightPosition);
+  // eyeDirection
+  gl.uniform3fv(uniLocations[4], eyeDirection);
+  // ambientColor
+  gl.uniform4fv(uniLocations[5], [0.5, 0.1, 0.1, 1.0]);
+  gl.drawElements(gl.TRIANGLES, vertex_data_plane.indices.length, gl.UNSIGNED_SHORT, 0);
+
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null); // Unbind framebuffer
+  // Draw Plane to no framebuffer, so we can see the plane. Set texture to the framebuffer texture
+  // gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
+  gl.viewport(0, 0, c.width, c.height); // Set viewport to canvas size
   // Clear Screen - Clears the screen
-  gl.clearColor(0.0, 0.0, 0.0, 1.0);
+  gl.clearColor(0.0, 0.0, 0.5, 1.0);
   gl.clearDepth(1.0);
   gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
-  // Increment count
-  count += 0.5;
-
-  // Calc rotation in radians
-  //const rad = ((count % 360) * Math.PI) / 180;
-  //const rad2 = ((count % 720) * Math.PI) / 360;
-
-  //lightPosition = [Math.sin(count / 100) * 2, 0.5, Math.cos(count / 100) * 2];
-
-  // Calculate mMatrix - Controls the transformation of object
   m.identity(mMatrix);
-  // m.translate(mMatrix, [0.0, Math.sin(rad), 0.0], mMatrix); // Translate to origin
-  // m.rotate(mMatrix, rad, [1.0, 1.0, 0.0], mMatrix); // Rotate around Y axis
-
+  // m.rotate(mMatrix, count, [0.0, 1.0, 0.0], mMatrix); // Rotate around y axis
   // Calculate mvpMatrix - Uses m, v, and p Matrices, and also generates the inverse for lighting calculations
   m.multiply(tmpMatrix, mMatrix, mvpMatrix); // MVP matrix
   m.inverse(mMatrix, invMatrix); // Inverse matrix
@@ -271,13 +301,17 @@ function drawFrame() {
   gl.uniform4fv(uniLocations[5], [0.1, 0.1, 0.1, 1.0]);
   // Set Textures - Textures are like uniforms but have a bit more setup for some reason
   // texture
-  // gl.activeTexture(gl.TEXTURE0);
-  // gl.bindTexture(gl.TEXTURE_2D, textures[0]);
-  // gl.uniform1i(textureUniformLocations[0], 0);
+  gl.activeTexture(gl.TEXTURE0);
+  gl.bindTexture(gl.TEXTURE_2D, fTexture);
+  gl.uniform1i(gl.getUniformLocation(prog as WebGLProgram, 'texture'), 0);
 
   // Draw Elements - Used to draw a mesh using an index buffer rather than just raw vertices.
-  gl.drawElements(gl.TRIANGLES, vertex_data.indices.length, gl.UNSIGNED_SHORT, 0);
+  gl.drawElements(gl.TRIANGLES, vertex_data_plane.indices.length, gl.UNSIGNED_SHORT, 0);
 
+  // unbind texture
+  gl.bindTexture(gl.TEXTURE_2D, null);
+  // unbind framebuffer
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
   // Flush - Isn't required, ensures all issued commands are executed asap
   // gl.flush();
 }
@@ -287,7 +321,7 @@ function animationLoop() {
   requestAnimationFrame(animationLoop);
 }
 
-// **** FUNCTIONS ****
+//#region **** FUNCTIONS ****
 
 function createShader(id: string) {
   let shader: WebGLShader | null = null;
@@ -454,6 +488,41 @@ async function createTexture(src: string): Promise<WebGLTexture | null> {
   }
 }
 
+function createFramebuffer(
+  width: number,
+  height: number,
+): {t: WebGLTexture; f: WebGLFramebuffer; d: WebGLRenderbuffer} {
+  const framebuffer = gl.createFramebuffer();
+
+  gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
+
+  // Depth render buffer
+  const depthBuffer = gl.createRenderbuffer();
+  gl.bindRenderbuffer(gl.RENDERBUFFER, depthBuffer);
+
+  gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_COMPONENT16, width, height);
+  gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.RENDERBUFFER, depthBuffer);
+
+  // Color texture
+  const fTexture = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, fTexture);
+  // Allocate texture memory - null means no data, so only allocate memory
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+
+  // attach to framebuffer
+  gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, fTexture, 0);
+
+  // Unbind all
+  gl.bindTexture(gl.TEXTURE_2D, null);
+  gl.bindRenderbuffer(gl.RENDERBUFFER, null);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+
+  // return framebuffer
+  return {f: framebuffer, d: depthBuffer, t: fTexture};
+}
+
 function hsva(h: number, s: number, v: number, a: number) {
   if (s > 1 || v > 1 || a > 1) {
     return;
@@ -476,3 +545,4 @@ function hsva(h: number, s: number, v: number, a: number) {
   }
   return color;
 }
+//#endregion
