@@ -11,13 +11,24 @@ if (!(cElement instanceof HTMLCanvasElement)) {
 }
 const c: HTMLCanvasElement = cElement;
 
-c.width = 500;
-c.height = 500;
+const cssW = cElement.clientWidth,
+  cssH = cElement.clientHeight,
+  dpr = window.devicePixelRatio || 1;
+
+c.width = Math.floor(cssW * dpr);
+c.height = Math.floor(cssH * dpr);
+
+c.style.width = `${cssW}px`;
+c.style.height = `${cssH}px`;
 
 // WebGL Context - Gets the context, checks that the getting of the context didn't fail.
 const glContext =
-  c.getContext('webgl', {preserveDrawingBuffer: true}) ??
-  c.getContext('experimental-webgl', {preserveDrawingBuffer: true});
+  c.getContext('webgl', {preserveDrawingBuffer: true, alpha: false, premultipliedAlpha: false}) ??
+  c.getContext('experimental-webgl', {
+    preserveDrawingBuffer: true,
+    alpha: false,
+    premultipliedAlpha: false,
+  });
 if (!glContext) {
   alert('Your browser does not support webgl');
   throw new Error('WebGL context unavailable');
@@ -31,7 +42,7 @@ if (!ext) {
 }
 
 // Clear Screen - Sets the globals for clear color and depth, and then clears the screen / depth buffer
-gl.clearColor(0.0, 0.0, 0.0, 1.0);
+gl.clearColor(0.071, 0.2, 0.2, 1.0);
 gl.clearDepth(1.0);
 gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
@@ -251,6 +262,10 @@ renderVBOS[0] = createVBO(indices);
 let i = 0;
 
 let doFirstFrame = true;
+
+gl.clearColor(0.071, 0.2, 0.2, 1.0);
+gl.clearDepth(1.0);
+gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
 function drawFrame() {
   const ni = i;

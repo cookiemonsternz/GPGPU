@@ -3,6 +3,8 @@ attribute vec2 textureCoord; // Texture coordinates
 attribute float a_index;
 uniform sampler2D texture; // Texture sampler
 uniform mat4 mvpMatrix; // Model-View-Projection matrix
+const vec4 startColor = vec4(0.22, 0.357, 0.6, 0.01); // Start color for the gradient
+const vec4 endColor = vec4(0.0, 1.0, 0.5, 0.01); // Color uniform for the fragment shader
 varying vec2 vTextureCoord; // Varying variable to pass texture coordinates to fragment shader
 varying vec4 vColor;
 
@@ -47,10 +49,26 @@ vec2 getPosValue(vec2 uv_pixel) {
     return vec2(unpackFloat(color_x), unpackFloat(color_y));
 }
 
+float get_utils_values(vec2 uv_pixel) {
+    // We return the color of the pixel in the utils quadrant
+    // Bottom left 
+    vec2 uv_utils;
+    if (uv_pixel.x < 0.5) {
+        uv_utils = vec2(uv_pixel.x, uv_pixel.y + 0.5);
+    } else {
+        uv_utils = vec2(uv_pixel.x - 0.5, uv_pixel.y + 0.5);
+    }
+    return unpackFloat(texture2D(texture, uv_utils));
+}
+
 // float getPosValue(vec2 uv) {
 //     vec4 color = texture2D(texture, uv);
 //     return unpackFloat(color) * 2.0 - 1.0;
 // }
+
+vec4 lerp_color(vec4 start, vec4 end, float t) {
+    return mix(start, end, t); // Linear interpolation between two colors
+}
 
 void main() {
     vTextureCoord = textureCoord * a_index; // Pass texture coordinates to fragment shader
@@ -59,13 +77,9 @@ void main() {
     float posY = floor(a_index / 128.0);
     vec2 uvX = (vec2(posX, posY) + 0.5) / 256.0;
     vec2 pos = getPosValue(uvX) * 2.0 - 1.0; // Get position value from texture
-    // float ypos = getPosValue(uvY); // top right corner
     float xpos = pos.x; // Get x position from texture
     float ypos = pos.y; // Get y position from texture
-    // vColor = vec4(xpos, ypos, a_index / 16384.0, 1.0); // Set color based on position
-    gl_Position = mvpMatrix * vec4(posX / 64.0 - 1.0, posY / 64.0 - 1.0, 0.0, 1.0); // Set position
-    vColor = vec4(xpos, ypos, a_index / 16384.0, 1.0); // Set color based on position
-    // gl_Position = mvpMatrix * vec4(xpos, ypos, 0.0, 1.0); // Set position
-    //gl_Position = vec4(0.0, 0.0, 0.0, 1.0); // Just center everything
-    gl_PointSize = 1.0; // Set point size to 1.0
+    vColor = lerp_color(startColor, endColor, get_utils_values(uvX)); // Get color from utils quadrant - lifetime
+    gl_Position = mvpMatrix * vec4(xpos, ypos, 0.0, 1.0); // Set position
+    gl_PointSize = 0.1; // Set point size to 1.0
 }
