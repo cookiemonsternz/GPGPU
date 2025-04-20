@@ -484,7 +484,7 @@ export class qtnIV {
     vec: [number, number, number],
     qtn: Float32Array,
     dest: [number, number, number],
-  ): Float32Array => {
+  ): [number, number, number] => {
     const qp = this.create();
     const qq = this.create();
     const qr = this.create();
@@ -540,7 +540,7 @@ export class qtnIV {
     time: number,
     dest: Float32Array,
   ): Float32Array {
-    let ht = qtn1[0] * qtn2[0] + qtn1[1] * qtn2[1] + qtn1[2] * qtn2[2] + qtn1[3] * qtn2[3];
+    const ht = qtn1[0] * qtn2[0] + qtn1[1] * qtn2[1] + qtn1[2] * qtn2[2] + qtn1[3] * qtn2[3];
     let hs = 1.0 - ht * ht;
     if (hs <= 0.0) {
       dest[0] = qtn1[0];
@@ -607,6 +607,9 @@ function torus(
       rt = 1.0 - rt;
       pos.push(tx, ty, tz);
       nor.push(rx, ry, rz);
+      if (!tc) {
+        throw new Error('color is undefined');
+      }
       col.push(tc[0], tc[1], tc[2], tc[3]);
       st.push(rs, rt);
     }
@@ -652,6 +655,9 @@ function sphere(
       const tc = color || hsva((360 / row) * i, 1, 1, 1);
       pos.push(tx, ty, tz);
       nor.push(rx, ry, rz);
+      if (!tc) {
+        throw new Error('color is undefined');
+      }
       col.push(tc[0], tc[1], tc[2], tc[3]);
       st.push(1 - (1 / column) * ii, (1 / row) * i);
     }

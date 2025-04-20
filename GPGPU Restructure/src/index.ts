@@ -15,7 +15,9 @@ c.width = 500;
 c.height = 500;
 
 // WebGL Context - Gets the context, checks that the getting of the context didn't fail.
-const glContext = c.getContext('webgl') ?? c.getContext('experimental-webgl');
+const glContext =
+  c.getContext('webgl', {preserveDrawingBuffer: true}) ??
+  c.getContext('experimental-webgl', {preserveDrawingBuffer: true});
 if (!glContext) {
   alert('Your browser does not support webgl');
   throw new Error('WebGL context unavailable');
@@ -279,20 +281,19 @@ function drawFrame() {
   gl.drawElements(gl.TRIANGLES, vertex_data.indices.length, gl.UNSIGNED_SHORT, 0);
   gl.bindTexture(gl.TEXTURE_2D, null);
   gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-  gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
   // Render scene
-  gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+  // gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
   gl.viewport(0, 0, c.width, c.height);
   gl.useProgram(render_prog);
-
+  // Alpha Blending - Enables alpha blending, the method used for transparency
+  gl.enable(gl.BLEND);
+  gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA); // just look at the site lol, w029
   // Texture 0 = current frame Data
   gl.activeTexture(gl.TEXTURE0);
   gl.bindTexture(gl.TEXTURE_2D, framebuffers[i].t);
   gl.uniform1i(gl.getUniformLocation(render_prog as WebGLProgram, 'texture'), 0);
 
-  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, null);
   // set_attribute(renderVBOS, renderAttLocations, renderAttStrides);
   // Bind the VBO for the index attribute
   gl.bindBuffer(gl.ARRAY_BUFFER, renderVBOS[0]);
@@ -307,6 +308,11 @@ function drawFrame() {
   gl.uniformMatrix4fv(renderUniLocations[0], false, mvpMatrix);
   ext.drawArraysInstancedANGLE(gl.POINTS, 0, 1, walker_count);
   ext.vertexAttribDivisorANGLE(renderAttLocations[0], 0);
+  gl.disable(gl.BLEND);
+  gl.bindTexture(gl.TEXTURE_2D, null);
+  gl.bindBuffer(gl.ARRAY_BUFFER, null);
+  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, null);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
 }
 
 function animationLoop() {
