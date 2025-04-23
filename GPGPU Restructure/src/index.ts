@@ -2,6 +2,7 @@ import * as shapes from './shapes.js';
 import {matIV, qtnIV} from './minMatrix.js';
 
 class App {
+  //#region Properties
   private m!: matIV;
   private gl!: WebGLRenderingContext;
   private ext!: ANGLE_instanced_arrays;
@@ -33,6 +34,8 @@ class App {
     attStrides: number[];
   }[] = [];
   private walkerCount: number;
+  public doRender = true;
+  //#endregion
 
   constructor(
     textureDim = 128,
@@ -40,7 +43,7 @@ class App {
       background: [number, number, number, number];
       start: [number, number, number, number];
       end: [number, number, number, number];
-    } = {background: [0, 0, 0, 1], start: [1, 0, 0, 1], end: [0, 0, 1, 1]},
+    } = {background: [0, 0, 0, 1], start: [1, 0, 0, 0.01], end: [0, 0, 1, 0.05]},
   ) {
     this.textureSize = textureDim * 4;
     this.walkerCount = textureDim * textureDim;
@@ -94,6 +97,9 @@ class App {
   }
 
   render(i: number, doFirstFrame = true) {
+    if (this.doRender === false) {
+      return;
+    }
     const newI = this.drawFrame(i, doFirstFrame);
     requestAnimationFrame(() => {
       this.render(newI, false);
@@ -232,6 +238,23 @@ class App {
     this.drawProgram = render_prog;
   }
 
+  compileUpdateProgram() {
+    const walker_v_shader = this.createShader('wvs');
+    const walker_f_shader = this.createShader('wfs');
+    if (!walker_v_shader || !walker_f_shader) {
+      console.error('Error compiling walker shaders');
+      return;
+    }
+    // program
+    const walker_update_prog = this.createProgram(walker_v_shader, walker_f_shader);
+    if (!walker_update_prog) {
+      console.error('Failed to create program');
+      throw new Error('Program creation failed'); // Stop
+    }
+
+    this.updateProgram = walker_update_prog;
+  }
+
   createMatrices() {
     this.m = new matIV();
     this.matrices = {
@@ -360,10 +383,10 @@ class App {
       }
     }
     // Store the uniform locations
-    this.uniforms.push(
+    this.uniforms = [
       {locations: updateUniLocations, values: []},
       {locations: renderUniLocations, values: []},
-    );
+    ];
   }
 
   async loadTextures(texture_srcs: string[]) {
@@ -384,6 +407,7 @@ class App {
         if (this.textures.length === 0 && texture_srcs.length > 0) {
           throw new Error('Failed to load any textures.');
         }
+        console.log('Textures loaded successfully');
         this.render(0, true);
       })
       .catch(error => {
@@ -636,3 +660,14 @@ class App {
 
 // Initialize the app
 const app = new App();
+window.addEventListener('keypress', event => {
+  if (event.key === 'r') {
+    console.warn('Reloading shaders');
+    console.time('Recompile');
+    app.doRender = false;
+    app.compileUpdateProgram();
+    app.getUniformLocations();
+    app.doRender = true;
+    console.timeEnd('Recompile');
+  }
+});

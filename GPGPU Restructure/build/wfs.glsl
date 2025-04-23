@@ -4,8 +4,8 @@ uniform sampler2D texture; // Texture sampler
 varying vec3 vPosition;
 varying vec2 vTextureCoord;
 
-const int num_directions = 300;
-const float jump_distance = 0.0001;
+const int num_directions = 200;
+const float jump_distance = 0.0005;
 
 float unpackFloat(vec4 c_normalized) {
     const float factor = 255.0 / 256.0;
@@ -165,7 +165,7 @@ void main() {
             gl_FragColor = resetLife(uv);
         } else {
             float current_life = unpackFloat(texture2D(texture, uv));
-            gl_FragColor = packFloat(current_life + 0.001);
+            gl_FragColor = packFloat(current_life + 0.01);
         }
     }
     // gl_FragColor = packFloat(current_pos.x); // Get position value from texture

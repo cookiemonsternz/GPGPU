@@ -81,5 +81,5 @@ void main() {
     float ypos = pos.y; // Get y position from texture
     vColor = lerp_color(startColor, endColor, get_utils_values(uvX)); // Get color from utils quadrant - lifetime
     gl_Position = mvpMatrix * vec4(xpos, ypos, 0.0, 1.0); // Set position
-    gl_PointSize = 0.1; // Set point size to 1.0
+    gl_PointSize = 2.0; // Set point size to 1.0
 }
