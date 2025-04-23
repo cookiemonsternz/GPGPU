@@ -1,12 +1,9 @@
 <!DOCTYPE html>
+<meta charset="utf-8", name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <html>
     <head>
         <title>WebGL TEST</title>
         <link rel="stylesheet" href="style.css">
-
-        <script src="minMatrix.js" type="module"></script>
-        <script src="shapes.js" type="module"></script>
-        <script src="index.js" type="module" defer></script>
 
         <script id="wvs" src="wvs.glsl" type="x-shader/x-vertex"></script>
         <script id="wfs" src="wfs.glsl" type="x-shader/x-fragment"></script>
@@ -14,8 +11,13 @@
         <script id="rfs" src="rfs.glsl" type="x-shader/x-fragment"></script>
     </head>
     <body>
+        <div id="editor"></div>
         <div id="container">
             <canvas id="canvas"></canvas>
         </div>
+        <script src="../static/ace/src-noconflict/ace.js" type="text/javascript" charset="utf-8"></script>
+        <script src="minMatrix.js" type="module"></script>
+        <script src="shapes.js" type="module"></script>
+        <script src="index.js" type="module" defer></script>
     </body>
 </html>

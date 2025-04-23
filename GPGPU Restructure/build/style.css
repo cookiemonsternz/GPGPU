@@ -2,15 +2,32 @@ body {
     margin: 0;
     padding: 0;
     overflow: hidden;
+    height: 100vh;
+    width: 100vw;
 }
 
 #container {
-    height: 100vh;
-    width: 100vw;
+    height: 100%;
+    width: 60%;
+    position: absolute;
+    right: 0;
+    top: 0;
     background-color: #000000;
 }
 
 canvas {
+    position: absolute;
+    margin-left: -10%;
+    margin-top: -10%;
+    height: 140%;
+    width: 120%;
+}
+
+#editor {
+    position: absolute;
+    top: 0;
+    left: 0;
     height: 100%;
-    width: 100%;
+    width: 40%;
+    z-index: 1;
 }

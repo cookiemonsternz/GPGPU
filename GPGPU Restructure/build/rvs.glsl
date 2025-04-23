@@ -29,19 +29,20 @@ vec4 packFloat(float value) {
 }
 
 vec2 getPosValue(vec2 uv_pixel) {
-    vec2 uv_x;
-    vec2 uv_y;
+    float is_left = step(uv_pixel.x, 0.5);
+    float is_right = 1.0 - is_left;
 
-    if (uv_pixel.x < 0.5) { // x pos
-        uv_x = uv_pixel;
-        uv_y = vec2(uv_pixel.x + 0.5, uv_pixel.y);
-    } else { // y pos
-        uv_x = vec2(uv_pixel.x - 0.5, uv_pixel.y);
-        uv_y = uv_pixel;
-    }
+    vec2 uv_x = uv_pixel + vec2(is_right * -0.5, 0.0); // x pos
+    vec2 uv_y = uv_pixel - vec2(is_left * 0.5, 0.0); // y pos
 
-    uv_x = clamp(uv_x, 0.0, 1.0);
-    uv_y = clamp(uv_y, 0.0, 1.0);
+    // if (uv_pixel.x < 0.5) { // x pos
+    //     uv_x = uv_pixel;
+    //     uv_y = vec2(uv_pixel.x + 0.5, uv_pixel.y);
+    // } else { // y pos
+    //     uv_x = vec2(uv_pixel.x - 0.5, uv_pixel.y);
+    //     uv_y = uv_pixel;
+    // }
+
 
     vec4 color_x = texture2D(texture, uv_x);
     vec4 color_y = texture2D(texture, uv_y);

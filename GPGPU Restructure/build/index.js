@@ -10,12 +10,17 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 import { matIV } from './minMatrix.js';
 class App {
     //#endregion
-    constructor(textureDim = 128, colors = { background: [0, 0, 0, 1], start: [1, 0, 0, 0.01], end: [0, 0, 1, 0.05] }) {
+    constructor(textureDim = 128, colors = {
+        background: [0.07, 0.2, 0.2, 1.0],
+        start: [0.21, 0.35, 0.6, 0.1],
+        end: [0.0, 1.0, 0.5, 0.05],
+    }) {
         this.frameBuffers = [];
         this.textures = [];
         this.uniforms = [];
         this.buffers = [];
         this.doRender = true;
+        this.doFirstFrame = true;
         this.textureSize = textureDim * 4;
         this.walkerCount = textureDim * textureDim;
         this.textureDim = textureDim;
@@ -64,16 +69,16 @@ class App {
         }
         this.ext = ext;
     }
-    render(i, doFirstFrame = true) {
+    render(i) {
         if (this.doRender === false) {
             return;
         }
-        const newI = this.drawFrame(i, doFirstFrame);
+        const newI = this.drawFrame(i);
         requestAnimationFrame(() => {
-            this.render(newI, false);
+            this.render(newI);
         });
     }
-    drawFrame(i, doFirstFrame) {
+    drawFrame(i) {
         const ni = i;
         i = (i + 1) % 2;
         // Draw to frame buffer first
@@ -83,11 +88,11 @@ class App {
         this.gl.viewport(0, 0, this.textureSize, this.textureSize);
         this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
         // Texture 0 = previous frame Data
-        if (doFirstFrame) {
+        if (this.doFirstFrame) {
             this.gl.activeTexture(this.gl.TEXTURE0);
             this.gl.bindTexture(this.gl.TEXTURE_2D, this.textures[0]);
             this.gl.uniform1i(this.gl.getUniformLocation(this.updateProgram, 'texture'), 0);
-            doFirstFrame = false;
+            this.doFirstFrame = false;
         }
         else {
             this.gl.activeTexture(this.gl.TEXTURE0);
@@ -176,9 +181,9 @@ class App {
         this.updateProgram = walker_update_prog;
         this.drawProgram = render_prog;
     }
-    compileUpdateProgram() {
+    compileUpdateProgram(wfsCode) {
         const walker_v_shader = this.createShader('wvs');
-        const walker_f_shader = this.createShader('wfs');
+        const walker_f_shader = this.createShaderFromCode(wfsCode, this.gl.FRAGMENT_SHADER);
         if (!walker_v_shader || !walker_f_shader) {
             console.error('Error compiling walker shaders');
             return;
@@ -317,7 +322,7 @@ class App {
                 throw new Error('Failed to load any textures.');
             }
             console.log('Textures loaded successfully');
-            this.render(0, true);
+            this.render(0);
         })
             .catch(error => {
             console.error('Error loading textures:', error);
@@ -378,6 +383,28 @@ class App {
         }
         else {
             console.error('Error compiling' + scriptElement.type + 'shader: ' + this.gl.getShaderInfoLog(shader));
+            this.gl.deleteShader(shader);
+            return null;
+        }
+    }
+    createShaderFromCode(code, type) {
+        // Create a shader object
+        const shader = this.gl.createShader(type);
+        if (!shader) {
+            console.error('Error while creating shader');
+            throw new Error('Could not create shader');
+        }
+        // Set the shader source code
+        this.gl.shaderSource(shader, code);
+        // Compile the shader
+        this.gl.compileShader(shader);
+        // Check for compilation errors
+        if (this.gl.getShaderParameter(shader, this.gl.COMPILE_STATUS)) {
+            console.log('Shader compiled successfully');
+            return shader;
+        }
+        else {
+            console.error(this.gl.getShaderInfoLog(shader));
             this.gl.deleteShader(shader);
             return null;
         }
@@ -511,14 +538,286 @@ class App {
 }
 // Initialize the app
 const app = new App();
-window.addEventListener('keypress', event => {
-    if (event.key === 'r') {
-        console.warn('Reloading shaders');
-        console.time('Recompile');
-        app.doRender = false;
-        app.compileUpdateProgram();
-        app.getUniformLocations();
-        app.doRender = true;
-        console.timeEnd('Recompile');
-    }
+window.addEventListener('resize', () => {
+    app.updateCanvasSize();
+    app.createFramebuffer(app.textureSize, app.textureSize);
+    app.doFirstFrame = true;
+    app.clearScreen(app.colors.background);
+    app.render(0);
 });
+function compileShaders() {
+    console.warn('Reloading shaders');
+    console.time('Recompile');
+    // First get the code for wfs, this is what the user will edit
+    const code = editor.getValue();
+    // Get the colors from the code
+    const colors = getColors(code);
+    app.colors.background = colors[0];
+    app.colors.start = colors[1];
+    app.colors.end = colors[2];
+    // Get the code for the shader
+    const shaderCode = getCode(code);
+    const wvsCode = '\n' + defaultWFSPt1 + shaderCode + defaultWFSPt2 + '\n';
+    // console.log('wvsCode', wvsCode);
+    // Test if the code is valid
+    // Compile the shader
+    app.doRender = false;
+    app.compileUpdateProgram(wvsCode);
+    app.getUniformLocations();
+    app.doFirstFrame = true;
+    app.clearScreen(app.colors.background);
+    app.doRender = true;
+    console.timeEnd('Recompile');
+}
+const defaultWFSPt1 = `precision highp float;
+
+uniform sampler2D texture; // Texture sampler
+varying vec3 vPosition;
+varying vec2 vTextureCoord;
+const float jump_distance = 0.0005;
+
+float unpackFloat(vec4 c_normalized) {
+    const float factor = 255.0 / 256.0;
+    return factor * (c_normalized.r +
+        c_normalized.g / 256.0 +
+        c_normalized.b / (256.0 * 256.0) +
+        c_normalized.a / (256.0 * 256.0 * 256.0));
+}
+
+vec4 packFloat(float value) {
+    value *= 256.0;
+    const float factor = 256.0;
+    float r = floor(value);
+    float g = floor(fract(value) * factor);
+    float b = floor(fract(value * factor) * factor);
+    float a = floor(fract(value * factor * factor) * factor);
+    return vec4(r, g, b, a) / 255.0;
+}
+
+vec3 permute(vec3 x) { return mod(((x*34.0)+1.0)*x, 289.0); }
+
+float snoise(vec2 v){
+  const vec4 C = vec4(0.211324865405187, 0.366025403784439,
+           -0.577350269189626, 0.024390243902439);
+  vec2 i  = floor(v + dot(v, C.yy) );
+  vec2 x0 = v -   i + dot(i, C.xx);
+  vec2 i1;
+  i1 = (x0.x > x0.y) ? vec2(1.0, 0.0) : vec2(0.0, 1.0);
+  vec4 x12 = x0.xyxy + C.xxzz;
+  x12.xy -= i1;
+  i = mod(i, 289.0);
+  vec3 p = permute( permute( i.y + vec3(0.0, i1.y, 1.0 ))
+  + i.x + vec3(0.0, i1.x, 1.0 ));
+  vec3 m = max(0.5 - vec3(dot(x0,x0), dot(x12.xy,x12.xy),
+    dot(x12.zw,x12.zw)), 0.0);
+  m = m*m ;
+  m = m*m ;
+  vec3 x = 2.0 * fract(p * C.www) - 1.0;
+  vec3 h = abs(x) - 0.5;
+  vec3 ox = floor(x + 0.5);
+  vec3 a0 = x - ox;
+  m *= 1.79284291400159 - 0.85373472095314 * ( a0*a0 + h*h );
+  vec3 g;
+  g.x  = a0.x  * x0.x  + h.x  * x0.y;
+  g.yz = a0.yz * x12.xz + h.yz * x12.yw;
+  return 130.0 * dot(m, g);
+}`;
+const defaultWFSPt2 = `vec2 random2D(vec2 uv) {
+    float x = sin(dot(uv, vec2(12.9898, 78.233))) * 43758.5453;
+    return normalize(vec2(fract(x), fract(x * 0.5)) * 2.0 - 1.0);
+}
+
+vec2 getPosValue(vec2 uv_pixel) {
+    vec2 uv_x;
+    vec2 uv_y;
+
+    if(uv_pixel.x < 0.5) { // x pos
+        uv_x = uv_pixel;
+        uv_y = vec2(uv_pixel.x + 0.5, uv_pixel.y);
+    } else { // y pos
+        uv_x = vec2(uv_pixel.x - 0.5, uv_pixel.y);
+        uv_y = uv_pixel;
+    }
+
+    uv_x = clamp(uv_x, 0.0, 1.0);
+    uv_y = clamp(uv_y, 0.0, 1.0);
+
+    vec4 color_x = texture2D(texture, uv_x);
+    vec4 color_y = texture2D(texture, uv_y);
+
+    return vec2(unpackFloat(color_x), unpackFloat(color_y));
+}
+
+vec2 getIdealNeighbour(vec2 uv_pixel, vec2 current_pos) {
+    vec2 idealNeighbour = current_pos;
+    float currentHighest = sdf(current_pos);
+
+    vec2 uv_x = (uv_pixel.x < 0.5) ? uv_pixel : vec2(uv_pixel.x - 0.5, uv_pixel.y);
+    vec2 base_seed = uv_x * dot(uv_x, vec2(12.9898, 78.233));
+
+    for(int i = 0; i < num_directions; i++) {
+        vec2 direction = random2D(base_seed + float(i) * 0.1);
+
+        vec2 neighbourPos = current_pos + direction * jump_distance;
+        float neighbourSDF = sdf(neighbourPos);
+
+        if(neighbourSDF > currentHighest) {
+            idealNeighbour = neighbourPos;
+            currentHighest = neighbourSDF;
+        }
+    }
+    return idealNeighbour;
+}
+
+bool isStuck(vec2 uv_pixel) {
+    vec2 current_pos = getPosValue(uv_pixel);
+    vec2 idealNeighbour = getIdealNeighbour(uv_pixel, current_pos);
+    return sdf(idealNeighbour) <= sdf(current_pos) + 0.0001;
+}
+
+vec2 getNewPos(vec2 uv_pixel, bool isCheck) {
+    vec2 current_pos = getPosValue(uv_pixel);
+    vec2 idealNeighbour = getIdealNeighbour(uv_pixel, current_pos);
+
+    if(sdf(idealNeighbour) > sdf(current_pos)) {
+        return idealNeighbour;
+    } else {
+        vec2 randomPos = vec2(fract(sin(dot(current_pos, vec2(12.9898, 78.233))) * 43758.5453), fract(sin(dot(current_pos, vec2(78.233, 12.9898))) * 43758.5453));
+        return randomPos * 2.0 - 1.0; // Scale to [-1, 1]
+    }
+}
+
+vec4 resetLife(vec2 uv_pixel) {
+    // // We need to get bottom left quadrant
+    // vec2 uv_utils;
+    // if (uv_pixel.x < 0.5) {
+    //     uv_utils = vec2(uv_pixel.x, uv_pixel.y + 0.5);
+    // } else {
+    //     uv_utils = vec2(uv_pixel.x - 0.5, uv_pixel.y + 0.5);
+    // }
+    return packFloat(0.0); // Reset life value
+}
+
+float get_utils_values(vec2 uv_pixel) {
+    // We return the color of the pixel in the utils quadrant
+    // Bottom left 
+    vec2 uv_utils;
+    if(uv_pixel.x < 0.5) {
+        uv_utils = vec2(uv_pixel.x, uv_pixel.y + 0.5);
+    } else {
+        uv_utils = vec2(uv_pixel.x - 0.5, uv_pixel.y + 0.5);
+    }
+    return unpackFloat(texture2D(texture, uv_utils));
+}
+
+void main() {
+    vec2 uv = gl_FragCoord.xy / vec2(512.0, 512.0);
+
+    if(uv.y <= 0.5) {
+        vec2 newPos = getNewPos(uv, false);
+        if(uv.x < 0.5) { // x pos
+            gl_FragColor = packFloat(newPos.x);
+        } else { // y pos
+            gl_FragColor = packFloat(newPos.y);
+        }
+    } else {
+        vec2 uv_pos = uv - vec2(0.0, 0.5);
+        if(isStuck(uv_pos) || unpackFloat(texture2D(texture, uv)) > 3.0) {
+            gl_FragColor = resetLife(uv);
+        } else {
+            float current_life = unpackFloat(texture2D(texture, uv));
+            gl_FragColor = packFloat(current_life + 0.01);
+        }
+    }
+    // gl_FragColor = packFloat(current_pos.x); // Get position value from texture
+    //gl_FragColor = vec4(0.57, 0.34, 0.34, 1.0); // Basic color output
+}`;
+// **** ACE ****
+const editor = ace.edit('editor', {
+    mode: 'ace/mode/glsl',
+    selectionStyle: 'text',
+});
+editor.setTheme('ace/theme/monokai');
+const defaultCode = `// *** ctrl + s to compile (cmd + s on mac) ***
+// most standard glsl functions are available
+// Webgl 1.0 so some limitations, e.g no round() :(
+// snoise - simplex noise - this is also available
+// more noise functions to come soon...
+// but you can always write your own :)
+
+// number of directions each walker checks
+// lower number = more performance
+const int num_directions = 200;
+
+const background_color = vec4(0.07, 0.2, 0.2, 1.0);
+const start_color = vec4(0.21, 0.35, 0.6, 0.1);
+const end_color = vec4(0.0, 1.0, 0.5, 0.05);
+
+float sdf(vec2 pos) {
+    float scale = 5.0;
+    // Example SDF function (noise), simplex noise
+    return snoise(pos * scale);
+}`;
+editor.setValue(defaultCode, -1);
+editor.commands.addCommand({
+    name: 'compile',
+    bindKey: { win: 'Ctrl-S', mac: 'Command-S' },
+    sender: 'editor|cli',
+    exec: function (editor) {
+        console.log('Compiling');
+        compileShaders(editor.getValue());
+    },
+});
+// **** REGEX ****
+function removeComments(code) {
+    const regex = /\/\/.*$/gm; // Single line comments
+    const regex2 = /\/\*[\s\S]*?\*\//g; // Multi-line comments
+    const cleanedCode = code.replace(regex, '').replace(regex2, '');
+    return cleanedCode;
+}
+function getColors(code) {
+    // Need to filter to return an array of form:
+    /*
+    colors = [
+      'const background_color = vec4(0.0, 0.0, 0.0, 1.0);',
+      'const start_color = vec4(1.0, 0.0, 0.0, 0.01);',
+      'const end_color = vec4(0.0, 0.0, 1.0, 0.05);',
+    ]
+    */
+    // Then filter again to get the color values and return array of form:
+    /*
+    colors = [
+      [0.0, 0.0, 0.0, 1.0],
+      [1.0, 0.0, 0.0, 0.01],
+      [0.0, 0.0, 1.0, 0.05],
+    ]
+    */
+    const regex = /const\s+(\w+)\s*=\s*vec4\(([^)]+)\);/g; // Regex to match vec4 colors
+    const colors = [];
+    let match;
+    while ((match = regex.exec(code)) !== null) {
+        colors.push(match[2]);
+    }
+    const colorValues = colors.map(color => {
+        const values = color.split(',').map(value => parseFloat(value.trim()));
+        return values;
+    });
+    return colorValues;
+}
+function getCode(code) {
+    // Get the 'code' part of the shader
+    // in the case of default code, this would be
+    /*
+    const int num_directions = 36;
+    float sdf(vec2 pos) {
+      float scale = 5.0;
+      return snoise(pos * scale);
+    }
+    */
+    // So we need to filter out the colors, comments, and any other junk
+    let cleanedCode = removeComments(code);
+    // Filter out the colors
+    const colorRegex = /const\s+(\w+)\s*=\s*vec4\(([^)]+)\);/g; // Regex to match vec4 colors
+    cleanedCode = cleanedCode.replace(colorRegex, '');
+    return cleanedCode;
+}
