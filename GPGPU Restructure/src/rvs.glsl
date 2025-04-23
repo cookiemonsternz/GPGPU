@@ -3,8 +3,8 @@ attribute vec2 textureCoord; // Texture coordinates
 attribute float a_index;
 uniform sampler2D texture; // Texture sampler
 uniform mat4 mvpMatrix; // Model-View-Projection matrix
-const vec4 startColor = vec4(0.22, 0.357, 0.6, 0.01); // Start color for the gradient
-const vec4 endColor = vec4(0.0, 1.0, 0.5, 0.01); // Color uniform for the fragment shader
+uniform vec4 startColor; // Start color for the gradient
+uniform vec4 endColor; // Color uniform for the fragment shader
 varying vec2 vTextureCoord; // Varying variable to pass texture coordinates to fragment shader
 varying vec4 vColor;
 
